@@ -1,11 +1,23 @@
 # Bugs and Fixes
 
+## [BANDIT-001] B104 — Binding su tutte le interfacce (residuo accettato)
+
+**Trovato**: 2026-06-03 (bandit Sprint 1)
+**File**: `adsb_secure/__main__.py:88`
+**Severità**: Medium (Bandit B104)
+**Stato**: Documentato — accettato per PoC locale
+
+**Descrizione**: `flask_app.run(host="0.0.0.0")` lega il server a tutte le interfacce.
+**Motivazione accettazione**: il progetto è un prototipo locale/accademico. In produzione → `host="127.0.0.1"` o reverse proxy.
+
+---
+
 ## [SECURITY-001] Input non validato in flightdata.py
 
 **Trovato**: 2026-06-03
 **File**: `device-rpi/flightdata.py`
 **Severità**: Alta
-**Stato**: Aperto — fix pianificato in Sprint 1 (S1-03)
+**Stato**: ✅ Risolto in Sprint 1 — `security/validator.py` creato
 
 **Descrizione**:
 `AirCraftData.parse_flightdata_json()` accetta tutti i campi del JSON senza validazione.
@@ -23,7 +35,7 @@ viene accettato e renderizzato senza alcun controllo.
 **Trovato**: 2026-06-03
 **File**: `device-rpi/flightdata.py:25,30`
 **Severità**: Bassa
-**Stato**: Aperto — fix in Sprint 1 (S1-06)
+**Stato**: ✅ Risolto in Sprint 1 — rimossi tutti i debug print
 
 **Descrizione**:
 ```python
@@ -42,7 +54,7 @@ Potenziale leakage di dati + degrado performance.
 **Trovato**: 2026-06-03
 **File**: `device-rpi/flightdata.py:refresh()`
 **Severità**: Alta
-**Stato**: Aperto — fix in Sprint 1 (S1-07)
+**Stato**: ✅ Risolto in Sprint 1 — try/except URLError + fallback a _last_json
 
 **Descrizione**:
 Se dump1090 non è raggiungibile, `urlopen()` lancia `urllib.error.URLError`.
@@ -57,7 +69,7 @@ Non c'è try/except → crash dell'applicazione.
 **Trovato**: 2026-06-03
 **File**: `device-rpi/flightdata.py:4`
 **Severità**: Media
-**Stato**: Aperto — fix in Sprint 1
+**Stato**: ✅ Risolto in Sprint 1 — `refresh()` usa `self.data_url`
 
 **Descrizione**:
 ```python

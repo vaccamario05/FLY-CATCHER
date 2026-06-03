@@ -1,52 +1,39 @@
 # Commands and Runbook
 
-## Setup ambiente (da completare in Sprint 1)
+## Setup ambiente ✅ Sprint 1 completato
 
 ```bash
-# Clone / navigazione
+# Navigazione
 cd /Users/mariomega05/Documents/Unversita/ProgettoPSS/fly-catcher
 
-# Virtual environment (da creare)
-python3 -m venv .venv
-source .venv/bin/activate
+# Dipendenze (usa python3.11 — ha pytest e flask installati)
+python3.11 -m pip install -r requirements.txt
 
-# Dipendenze (requirements.txt da creare in S1-01)
-pip install -r requirements.txt
-
-# Variabili d'ambiente sicurezza (da Sprint 2)
-export ADSB_HMAC_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+# Variabili d'ambiente sicurezza (Sprint 2)
+export ADSB_HMAC_KEY="$(python3.11 -c 'import secrets; print(secrets.token_hex(32))')"
 export DUMP1090_URL="http://localhost:8080/data/aircraft.json"
 export RATE_LIMIT_PPS=100
 export HMAC_WINDOW_SECONDS=30
 ```
 
-## Avvio simulatore (Sprint 1)
+## Avvio ADS-B Secure ✅ Sprint 1
 
 ```bash
-# Replay JSON esistente (senza hardware SDR)
-python3 simulator/replay.py --file notebook/samples/testing/sample.json --loop
+# Modalità simulatore (senza hardware SDR)
+python3.11 -m adsb_secure --mode simulator --file notebook/samples/testing/sample.json
+# → pipeline ogni 5s, dashboard a http://localhost:5000
 
-# Con velocità artificiale (per test flooding)
-python3 simulator/replay.py --file notebook/samples/testing/sample.json --pps 50
-```
+# Modalità live (con dump1090)
+python3.11 -m adsb_secure --mode live --url http://localhost:8080/data/aircraft.json
 
-## Avvio pipeline ADS-B Secure (da Sprint 2)
+# Simulatore standalone (CLI)
+python3.11 simulator/replay.py --file notebook/samples/testing/sample.json --loop --interval 2
 
-```bash
-# Modalità simulatore
-python3 -m adsb_secure --mode simulator --file notebook/samples/testing/sample.json
-
-# Modalità dump1090 (con hardware SDR)
-python3 -m adsb_secure --mode live --url http://localhost:8080/data/aircraft.json
-```
-
-## Avvio web dashboard (Sprint 2)
-
-```bash
-python3 web/app.py
-# Dashboard: http://localhost:5000
-# API aircraft: http://localhost:5000/api/aircraft
-# API audit: http://localhost:5000/api/audit/logs
+# API routes disponibili Sprint 1:
+# GET /health             → {"status":"ok","sprint":1}
+# GET /api/traces         → lista tracce con status
+# GET /api/aircraft/<hex> → dettaglio + history traccia
+# GET /                   → dashboard HTML con auto-refresh 5s
 ```
 
 ## Avvio legacy Fly-catcher (pygame su RPi)
@@ -59,28 +46,30 @@ python3 piawareradar.py <lat> <lon> [--piawareip <ip>]
 python3 piawareradar.py 40.85 14.27 --piawareip localhost
 ```
 
-## Test
+## Test ✅ 35 passing (Sprint 1)
 
 ```bash
 # Tutti i test
-python3 -m pytest tests/ -v
+python3.11 -m pytest tests/ -v
 
-# Solo validator
-python3 -m pytest tests/test_validator.py -v
+# Solo validator (21 test)
+python3.11 -m pytest tests/test_validator.py -v
 
-# Solo security layer
-python3 -m pytest tests/test_hmac.py tests/test_replay.py tests/test_rate.py -v
+# Solo simulator (8 test)
+python3.11 -m pytest tests/test_simulator.py -v
+
+# Solo web / Flask (5 test)
+python3.11 -m pytest tests/test_web.py -v
 
 # Con coverage
-python3 -m pytest tests/ --cov=adsb_secure --cov-report=term-missing
+python3.11 -m pytest tests/ --cov=adsb_secure --cov=security --cov=simulator --cov-report=term-missing
 ```
 
-## Security scan
+## Security scan ✅ Sprint 1 — 1 Medium residuo (B104, documentato)
 
 ```bash
 # Static analysis
-pip install bandit
-bandit -r device-rpi/ security/ web/ ml/ -f txt
+python3.11 -m bandit -r adsb_secure/ security/ simulator/ web/ -f txt
 
 # Dependency audit
 pip install pip-audit

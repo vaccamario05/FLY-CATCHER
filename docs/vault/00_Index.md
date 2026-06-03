@@ -33,14 +33,16 @@
 ## Quick Status
 
 ```
-Foundation Layer  [ ] Non iniziato
-Security Layer    [ ] Non iniziato  
-Intelligence Layer[ ] Non iniziato
-Vault             [x] Bootstrapped + aggiornato
+Foundation Layer  [x] COMPLETATO — commit 3e094c5
+Security Layer    [ ] Non iniziato (Sprint 2)
+Intelligence Layer[ ] Non iniziato (Sprint 3)
+Vault             [x] Aggiornato
 Feasibility       [x] Completato
 Sprint Plan       [x] Approvato
 Claude OS         [x] CLAUDE.md + agents + skills + hooks
-ADR-001 Flask     [x] APPROVATO — Flask come UI principale
+ADR-001 Flask     [x] APPROVATO — implementato
+Tests             [x] 35/35 passing
+Bandit            [x] 1 Medium residuo (B104, accettato)
 ```
 
 ## Architettura confermata

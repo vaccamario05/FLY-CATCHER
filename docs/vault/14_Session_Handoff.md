@@ -1,6 +1,53 @@
 # Session Handoff
 
-## Ultima sessione: 2026-06-03 — Sessione 3: ADR-001 approvato + architettura Flask
+## Ultima sessione: 2026-06-03 — Sessione 4: Sprint 1 implementato ✅
+
+### Cosa è stato fatto
+
+1. **Sprint 1 completo** — commit `3e094c5`
+2. **`device-rpi/flightdata.py` patchato** — rimossi 5 debug print, error handling, URL fix
+3. **`adsb_secure/normalizer.py`** — AirCraftData + TraceStatus + build_from_dict() (gestisce alt_baro/gs/baro_rate)
+4. **`security/validator.py`** — StructuralValidator con 12 check (ICAO, lat/lon, alt, speed, track, flight, squawk)
+5. **`adsb_secure/acquisition.py`** — DataIngestion + URL scheme validation (fix B310 Bandit)
+6. **`adsb_secure/trace_store.py`** — TraceStore thread-safe con deque per ICAO
+7. **`simulator/replay.py`** — JSONSimulator con loop mode + CLI
+8. **`web/app.py`** — Flask create_app() + /health + /api/traces + /api/aircraft/<icao> + dashboard HTML
+9. **`adsb_secure/__main__.py`** — entrypoint pipeline + Flask wired
+10. **35 test tutti verdi** — validator(21) + simulator(8) + web(5)
+11. **Bandit**: 1 Medium residuo (B104 bind 0.0.0.0) — documentato e accettato per PoC
+12. **`requirements.txt` + `pytest.ini` + `.gitignore`** creati
+
+### File creati/toccati
+- `adsb_secure/__init__.py`, `__main__.py`, `acquisition.py`, `normalizer.py`, `trace_store.py`
+- `security/__init__.py`, `validator.py`
+- `simulator/__init__.py`, `replay.py`
+- `web/__init__.py`, `app.py`, `routes/__init__.py`
+- `tests/conftest.py`, `test_validator.py`, `test_simulator.py`, `test_web.py`
+- `requirements.txt`, `pytest.ini`, `.gitignore`
+- `device-rpi/flightdata.py` (patched)
+- `docs/vault/11_Bugs_and_Fixes.md`, `12_Commands_and_Runbook.md`
+
+### Scoperta importante durante implementazione
+Sample JSON usa `alt_baro`, `gs`, `baro_rate` — Fly-catcher usava `altitude`, `speed`, `vert_rate`.
+`build_from_dict()` gestisce entrambi con fallback. Documentato nel codice.
+
+### Python env nota
+`python3.11` dalla Homebrew — ha pytest/flask installati. Usare `python3.11 -m pytest`.
+
+### Next steps — Sprint 2
+
+1. `feat(hmac)`: `security/hmac_validator.py` — HMAC-SHA256, key da `ADSB_HMAC_KEY` env
+2. `feat(replay)`: `security/replay_detector.py` — timestamp window + bounded dedup set
+3. `feat(ratelimit)`: `security/rate_limiter.py` — token bucket
+4. `feat(classifier)`: aggregatore validator + hmac + replay → TraceStatus finale
+5. `feat(logging)`: `security/forensic_logger.py` — append-only JSONL + SHA-256 chain
+6. `feat(auth)`: `web/auth.py` — login, hashed passwords, RBAC decorator, session timeout
+7. `feat(web)`: dashboard con colori per status, alert panel
+8. Test per ogni modulo (hmac, replay, rate, forensic, auth)
+
+---
+
+## Sessione precedente: 2026-06-03 — Sessione 3: ADR-001 approvato + architettura Flask
 
 ### Cosa è stato fatto
 
