@@ -1,4 +1,4 @@
-"""Smoke tests for web/app.py — Flask routes."""
+"""Smoke tests for web/app.py — Flask routes (Sprint 2: auth required)."""
 
 import pytest
 from web.app import create_app
@@ -15,6 +15,24 @@ def client():
         yield c, store
 
 
+@pytest.fixture
+def auth_client(client):
+    """Client pre-authenticated as operator."""
+    c, store = client
+    c.post("/login", data={"username": "operator", "password": "operator123"})
+    return c, store
+
+
+@pytest.fixture
+def analyst_client(client):
+    """Client pre-authenticated as analyst."""
+    c, store = client
+    c.post("/login", data={"username": "analyst", "password": "analyst123"})
+    return c, store
+
+
+# --- Public routes ---
+
 def test_health_returns_200(client):
     c, _ = client
     resp = c.get("/health")
@@ -23,15 +41,24 @@ def test_health_returns_200(client):
     assert data["status"] == "ok"
 
 
-def test_api_traces_empty(client):
+def test_unauthenticated_redirects(client):
     c, _ = client
+    resp = c.get("/")
+    assert resp.status_code == 302
+    assert "login" in resp.headers["Location"]
+
+
+# --- Protected routes (operator) ---
+
+def test_api_traces_empty(auth_client):
+    c, _ = auth_client
     resp = c.get("/api/traces")
     assert resp.status_code == 200
     assert resp.get_json() == []
 
 
-def test_api_traces_with_data(client):
-    c, store = client
+def test_api_traces_with_data(auth_client):
+    c, store = auth_client
     ac = AirCraftData(
         hex="aabbcc", squawk=None, flight="TEST01",
         lat=45.0, lon=9.0, seen_pos=1.0, altitude=10000,
@@ -48,14 +75,14 @@ def test_api_traces_with_data(client):
     assert data[0]["status"] == "valid"
 
 
-def test_api_aircraft_not_found(client):
-    c, _ = client
+def test_api_aircraft_not_found(auth_client):
+    c, _ = auth_client
     resp = c.get("/api/aircraft/000000")
     assert resp.status_code == 404
 
 
-def test_api_aircraft_found(client):
-    c, store = client
+def test_api_aircraft_found(auth_client):
+    c, store = auth_client
     ac = AirCraftData(
         hex="123abc", squawk=None, flight=None,
         lat=10.0, lon=20.0, seen_pos=None, altitude=5000,
@@ -71,8 +98,31 @@ def test_api_aircraft_found(client):
     assert data["latest"]["status"] == "suspicious"
 
 
-def test_dashboard_returns_html(client):
-    c, _ = client
+def test_dashboard_returns_html(auth_client):
+    c, _ = auth_client
     resp = c.get("/")
     assert resp.status_code == 200
     assert b"ADS-B Secure" in resp.data
+
+
+# --- RBAC ---
+
+def test_operator_forbidden_from_audit(auth_client):
+    c, _ = auth_client
+    resp = c.get("/api/audit/logs")
+    assert resp.status_code == 403
+
+
+def test_analyst_allowed_audit(analyst_client):
+    c, _ = analyst_client
+    resp = c.get("/api/audit/logs")
+    # 503 = no forensic_logger configured, but auth passed
+    assert resp.status_code in (200, 503)
+    assert resp.status_code != 403
+
+
+def test_analyst_chain_verify(analyst_client):
+    c, _ = analyst_client
+    resp = c.get("/api/audit/verify")
+    assert resp.status_code in (200, 503)
+    assert resp.status_code != 403
