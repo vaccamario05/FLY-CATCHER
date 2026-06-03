@@ -23,7 +23,7 @@ def test_fresh_packet_not_replay():
 
 
 def test_stale_packet_is_replay():
-    d = ReplayDetector(window_seconds=30)
+    d = ReplayDetector(window_seconds=30, check_stale=True)
     ac = _make_ac(seen=60.0)  # seen=60s > window=30s
     result = d.check(ac)
     assert result.replay_detected is True

@@ -18,6 +18,7 @@ Outputs:
 import argparse
 import json
 import os
+import secrets
 import sys
 import time
 import tempfile
@@ -26,8 +27,19 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("demo")
 
+# Auto-generate HMAC key for demo if not set — ensures tamper test always works
+if not os.environ.get("ADSB_HMAC_KEY"):
+    _demo_key = secrets.token_hex(32)
+    os.environ["ADSB_HMAC_KEY"] = _demo_key
+    print(f"[demo] Auto-generated ADSB_HMAC_KEY: {_demo_key[:16]}...")
+    print(f"[demo] To reuse in another terminal: export ADSB_HMAC_KEY={_demo_key}\n")
 
-def _pipeline(raw_records: list[dict], label: str) -> None:
+# Demo uses lower IF threshold so ghost detection fires reliably
+if not os.environ.get("IF_THRESHOLD"):
+    os.environ["IF_THRESHOLD"] = "0.6"
+
+
+def _pipeline(raw_records: list[dict], label: str, check_stale: bool = False) -> None:
     """Run records through the full pipeline and print results."""
     from adsb_secure.normalizer import build_from_dict, TraceStatus
     from security.validator import StructuralValidator
@@ -40,7 +52,7 @@ def _pipeline(raw_records: list[dict], label: str) -> None:
     log_file = tempfile.mktemp(suffix="_demo.jsonl")
     validator = StructuralValidator()
     hmac_v = HMACValidator()
-    replay_d = ReplayDetector(window_seconds=30)
+    replay_d = ReplayDetector(window_seconds=30, check_stale=check_stale)
     rate_l = TokenBucketRateLimiter(pps=10, burst=10)  # low limit for demo — drop after 10
     flog = ForensicLogger(log_file)
 
@@ -177,21 +189,28 @@ def ghost_attack_valid_format() -> None:
 
 
 def replay_attack() -> None:
-    """Replay attack — old timestamp."""
-    records = [
-        {
-            "hex": "3c4b12",
-            "flight": "DLH400 ",
-            "lat": 48.1, "lon": 11.6,
-            "alt_baro": 32000, "gs": 480.0, "track": 270.0, "baro_rate": 0,
-            "seen_pos": 1.0, "messages": 5000,
-            "seen": 60.0,  # 60 seconds > window (30s) → REPLAY
-            "rssi": -18.0,
-        }
-    ]
-    print("\nReplay attack: seen=60s (window=30s)")
-    print("Expected: REPLAY_DETECTED → SUSPICIOUS")
-    _pipeline(records, "Replay Attack (MC2)")
+    """Replay attack — packet passes HMAC but is stale (seen=60s > window=30s)."""
+    raw = {
+        "hex": "3c4b12",
+        "flight": "DLH400 ",
+        "lat": 48.1, "lon": 11.6,
+        "alt_baro": 32000, "gs": 480.0, "track": 270.0, "baro_rate": 0,
+        "seen_pos": 1.0, "messages": 5000,
+        "seen": 60.0,  # 60 seconds > window (30s) → REPLAY
+        "rssi": -18.0,
+    }
+    # Sign the packet so it passes HMAC and reaches the replay detector
+    key = os.environ.get("ADSB_HMAC_KEY", "")
+    if key:
+        from adsb_secure.normalizer import build_from_dict
+        from security.hmac_validator import HMACValidator
+        ac = build_from_dict(raw)
+        raw["_hmac_tag"] = HMACValidator().sign(ac)
+        print("\nReplay attack: packet HMAC-signed (valid), seen=60s (> window=30s)")
+    else:
+        print("\nReplay attack: seen=60s (window=30s) [no HMAC key — HMAC skipped]")
+    print("Expected: REPLAY_DETECTED → SUSPICIOUS (stale timestamp)")
+    _pipeline([raw], "Replay Attack (MC2)", check_stale=True)
 
 
 def tamper_attack() -> None:

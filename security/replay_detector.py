@@ -47,8 +47,9 @@ class ReplayDetector:
             # handle
     """
 
-    def __init__(self, window_seconds: float = _DEFAULT_WINDOW):
+    def __init__(self, window_seconds: float = _DEFAULT_WINDOW, check_stale: bool = True):
         self.window = window_seconds
+        self.check_stale = check_stale  # False in simulator mode — 'seen' field is historical
         # bounded set: store (key, seen_at) pairs
         self._seen: deque = deque(maxlen=_MAX_DEDUP)
         self._seen_set: set = set()
@@ -61,9 +62,8 @@ class ReplayDetector:
         now = time.time()
 
         # Timestamp check: packet must be fresh
-        if aircraft.seen is not None:
-            packet_age = now - aircraft.received_at
-            # seen = seconds since last message; if seen > window, packet is stale
+        # Disabled in simulator mode — 'seen' in historical JSON is always large
+        if self.check_stale and aircraft.seen is not None:
             if aircraft.seen > self.window:
                 aircraft.replay_detected = True
                 aircraft.status = TraceStatus.SUSPICIOUS

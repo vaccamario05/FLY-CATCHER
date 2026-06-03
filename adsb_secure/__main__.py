@@ -120,17 +120,23 @@ def main() -> None:
     trace_store = TraceStore()
     validator = StructuralValidator()
     hmac_validator = HMACValidator()
-    replay_detector = ReplayDetector()
     rate_limiter = TokenBucketRateLimiter()
     forensic_logger = ForensicLogger()
 
     if args.mode == "simulator":
         from simulator.replay import JSONSimulator
+        from simulator.preprocessor import HMACPreprocessor
         sim = JSONSimulator(args.file, loop=True)
-        acquisition = DataIngestion(simulator=sim)
-        logger.info("Mode: simulator (%s)", args.file)
+        # Sign records with HMAC tag if key is set
+        signed_sim = HMACPreprocessor(sim)
+        acquisition = DataIngestion(simulator=signed_sim)
+        # In simulator mode: skip stale check (historical 'seen' values are large)
+        # Only use deduplication check to detect same record sent twice
+        replay_detector = ReplayDetector(check_stale=False)
+        logger.info("Mode: simulator (%s) — stale check disabled", args.file)
     else:
         acquisition = DataIngestion(url=args.url)
+        replay_detector = ReplayDetector()  # full check in live mode
         logger.info("Mode: live (%s)", args.url)
 
     pipeline_thread = threading.Thread(
