@@ -1,5 +1,41 @@
 # Bugs and Fixes
 
+## [PIP-AUDIT-001] CVE urllib3 — dipendenza transitiva Flask
+
+**Trovato**: 2026-06-03 (pip-audit sessione finale)
+**Package**: urllib3 2.2.3 (installato transitivamente da Flask/werkzeug)
+**CVE**: CVE-2025-50182, CVE-2025-50181, CVE-2025-66418, CVE-2025-66471, CVE-2026-21441
+**Fix disponibile**: urllib3 ≥ 2.5.0 / 2.6.0 / 2.6.3
+**Stato**: Non urgente — impatto limitato a PoC locale senza TLS esterno
+
+**Nota**: torch CVE (PYSEC-2025-*) — torch NON è dipendenza del progetto, è installato globalmente nell'ambiente Python di sistema. Non nel `requirements.txt`.
+
+**Azione**: quando si fa `pip install -r requirements.txt` in un ambiente pulito le versioni aggiornate di flask traineranno urllib3 aggiornata. Documentato per audit.
+
+---
+
+## [BANDIT-002] B301/B403 pickle — risolto con joblib
+
+**Trovato**: 2026-06-03 (bandit Sprint 3)
+**File**: `ml/anomaly_detector.py`
+**Severità originale**: 2× Medium (B301, B403)
+**Stato**: ✅ Risolto — sostituito `pickle` con `joblib` (sklearn-recommended)
+
+**Fix**: `import joblib` + `joblib.dump()` / `joblib.load()` invece di `pickle.dump/load`.
+
+---
+
+## [BANDIT-003] B112 try/except/continue — accettato in training script
+
+**Trovato**: 2026-06-03 (bandit sessione finale)
+**File**: `ml/train.py:59`
+**Severità**: Low (B112)
+**Stato**: Documentato — accettato
+
+**Motivazione**: il training script salta record malformati nei samples — comportamento corretto. Non è un problema di sicurezza.
+
+---
+
 ## [BANDIT-001] B104 — Binding su tutte le interfacce (residuo accettato)
 
 **Trovato**: 2026-06-03 (bandit Sprint 1)

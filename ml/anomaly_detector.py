@@ -5,14 +5,15 @@ Purpose: Isolation Forest anomaly detector for ADS-B traces.
 
 Trained on legitimate samples from notebook/samples/.
 Classifies traces as normal or anomalous based on kinematic features.
-Model persisted to disk (models/isolation_forest.pkl).
+Model persisted to disk via joblib (sklearn-recommended serialization).
 """
 
 import logging
 import os
-import pickle
 from pathlib import Path
 from typing import Optional
+
+import joblib  # sklearn-recommended — avoids pickle security issues (Bandit B301/B403)
 
 import numpy as np
 from sklearn.ensemble import IsolationForest
@@ -52,10 +53,8 @@ class AnomalyDetector:
     def _try_load(self) -> None:
         try:
             if Path(_MODEL_PATH).exists() and Path(_SCALER_PATH).exists():
-                with open(_MODEL_PATH, "rb") as f:
-                    self._model = pickle.load(f)
-                with open(_SCALER_PATH, "rb") as f:
-                    self._scaler = pickle.load(f)
+                self._model = joblib.load(_MODEL_PATH)
+                self._scaler = joblib.load(_SCALER_PATH)
                 self._trained = True
                 logger.info("Loaded IF model from %s", _MODEL_PATH)
         except Exception as e:
@@ -80,10 +79,8 @@ class AnomalyDetector:
 
     def _save(self) -> None:
         Path(_MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
-        with open(_MODEL_PATH, "wb") as f:
-            pickle.dump(self._model, f)
-        with open(_SCALER_PATH, "wb") as f:
-            pickle.dump(self._scaler, f)
+        joblib.dump(self._model, _MODEL_PATH)
+        joblib.dump(self._scaler, _SCALER_PATH)
         logger.info("IF model saved to %s", _MODEL_PATH)
 
     def predict(self, vector: list[float]) -> tuple[float, str]:

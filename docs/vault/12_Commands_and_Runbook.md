@@ -46,23 +46,58 @@ python3 piawareradar.py <lat> <lon> [--piawareip <ip>]
 python3 piawareradar.py 40.85 14.27 --piawareip localhost
 ```
 
-## Test ✅ 35 passing (Sprint 1)
+## Test ✅ 97 passing (Sprint 1+2+3)
 
 ```bash
 # Tutti i test
 python3.11 -m pytest tests/ -v
 
-# Solo validator (21 test)
-python3.11 -m pytest tests/test_validator.py -v
+# Per sprint/modulo
+python3.11 -m pytest tests/test_validator.py -v       # Sprint 1 — validator (21)
+python3.11 -m pytest tests/test_simulator.py -v       # Sprint 1 — simulator (8)
+python3.11 -m pytest tests/test_hmac.py -v            # Sprint 2 — HMAC (8)
+python3.11 -m pytest tests/test_replay.py -v          # Sprint 2 — replay (7)
+python3.11 -m pytest tests/test_rate_limiter.py -v    # Sprint 2 — rate limit (6)
+python3.11 -m pytest tests/test_forensic.py -v        # Sprint 2 — forensic log (8)
+python3.11 -m pytest tests/test_auth.py -v            # Sprint 2 — auth RBAC (12)
+python3.11 -m pytest tests/test_features.py -v        # Sprint 3 — feature extractor (8)
+python3.11 -m pytest tests/test_anomaly.py -v         # Sprint 3 — Isolation Forest (11)
+python3.11 -m pytest tests/test_web.py -v             # Flask routes (10)
 
-# Solo simulator (8 test)
-python3.11 -m pytest tests/test_simulator.py -v
+# Coverage
+python3.11 -m pytest tests/ --cov=adsb_secure --cov=security --cov=ml --cov=simulator --cov-report=term-missing
+```
 
-# Solo web / Flask (5 test)
-python3.11 -m pytest tests/test_web.py -v
+## Training IF (Sprint 3)
 
-# Con coverage
-python3.11 -m pytest tests/ --cov=adsb_secure --cov=security --cov=simulator --cov-report=term-missing
+```bash
+# Train Isolation Forest su samples reali + 200 sintetici
+python3.11 -m ml.train --samples notebook/samples --augment 200
+
+# Risultato: models/isolation_forest.pkl + models/isolation_forest_scaler.pkl
+# models/ è in .gitignore — si rigenera
+```
+
+## Avvio con HMAC preprocessore (test pipeline end-to-end)
+
+```bash
+# Genera chiave e avvia con records firmati HMAC
+export ADSB_HMAC_KEY=$(python3.11 -c 'import secrets; print(secrets.token_hex(32))')
+python3.11 -m adsb_secure --mode simulator
+# I record dal simulatore vengono firmati dal HMACPreprocessor se ADSB_HMAC_KEY è set
+# HMAC check nel pipeline verifica la firma
+```
+
+## Security scan ✅ Finale — 0 High, 0 Medium, 1 Low
+
+```bash
+# Bandit (tutti i moduli)
+python3.11 -m bandit -r adsb_secure/ security/ ml/ simulator/ web/ -f txt
+
+# pip-audit
+python3.11 -m pip_audit
+
+# Risultati documentati in 11_Bugs_and_Fixes.md
 ```
 
 ## Security scan ✅ Sprint 1 — 1 Medium residuo (B104, documentato)

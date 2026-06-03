@@ -27,26 +27,31 @@ _DASHBOARD_HTML = """
 <head>
   <meta charset="UTF-8">
   <title>ADS-B Secure Dashboard</title>
-  <meta http-equiv="refresh" content="5">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { font-family: monospace; background: #0a0a0a; color: #00ff41; margin: 2rem; }
-    h1 { border-bottom: 1px solid #00ff41; padding-bottom: .5rem; }
+    * { box-sizing: border-box; }
+    body { font-family: monospace; background: #0a0a0a; color: #00ff41; margin: 0; padding: 1rem; }
+    h1 { border-bottom: 1px solid #00ff41; padding-bottom: .4rem; margin: 0 0 .5rem; font-size: 1.2rem; }
     a { color: #00ff41; }
-    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-    th, td { border: 1px solid #1a1a1a; padding: .4rem .8rem; text-align: left; font-size: .85em; }
+    .top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; }
+    .nav a { margin-left: .8rem; color: #aaa; text-decoration: none; font-size:.85em; }
+    .nav a:hover { color: #00ff41; }
+    .stats { font-size:.8em; color:#aaa; margin:.3rem 0; }
+    #map { width:100%; height:400px; background:#111; border:1px solid #1a1a1a; margin:.5rem 0; border-radius:4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: .5rem; }
+    th, td { border: 1px solid #1a1a1a; padding: .3rem .6rem; text-align: left; font-size: .8em; }
+    th { background:#111; color:#aaa; }
     .valid   { color: #00ff41; }
     .suspicious { color: #ff4444; font-weight: bold; }
     .unverified { color: #ffaa00; }
     .invalid { color: #555; }
-    .badge { padding: .1rem .4rem; border-radius: 3px; }
-    .top-bar { display:flex; justify-content:space-between; align-items:center; }
-    .nav a { margin-left: 1rem; color: #aaa; text-decoration: none; }
-    .nav a:hover { color: #00ff41; }
+    .badge { padding: .1rem .3rem; border-radius: 3px; font-size:.75em; }
   </style>
 </head>
 <body>
   <div class="top-bar">
-    <h1>ADS-B Secure</h1>
+    <h1>&#9992; ADS-B Secure</h1>
     <nav class="nav">
       {% if role == 'analyst' %}
         <a href="/api/audit/logs">Audit Logs</a>
@@ -56,36 +61,89 @@ _DASHBOARD_HTML = """
       <a href="/logout">Logout ({{ username }})</a>
     </nav>
   </div>
-  <p>
+  <div class="stats">
     Traces: <strong>{{ traces|length }}</strong> &nbsp;|&nbsp;
-    Suspicious: <strong style="color:#ff4444">{{ suspicious }}</strong> &nbsp;|&nbsp;
+    <span style="color:#ff4444">Suspicious: <strong>{{ suspicious }}</strong></span> &nbsp;|&nbsp;
     Auto-refresh: 5s &nbsp;|&nbsp; Role: <em>{{ role }}</em>
-  </p>
+  </div>
+
+  <!-- Leaflet map -->
+  <div id="map"></div>
+
+  <!-- Trace table -->
   <table>
     <tr>
       <th>ICAO</th><th>Flight</th><th>Status</th>
       <th>Lat</th><th>Lon</th><th>Alt (ft)</th>
-      <th>Speed (kt)</th><th>Track</th><th>Anomaly</th><th>Reason</th>
+      <th>Speed (kt)</th><th>Track&deg;</th><th>Anomaly</th><th>Reason</th>
     </tr>
     {% for t in traces %}
     <tr>
       <td><a href="/api/aircraft/{{ t.hex }}">{{ t.hex }}</a></td>
       <td>{{ t.flight or '—' }}</td>
-      <td class="{{ t.status }}">
-        <span class="badge">{{ t.status.upper() }}</span>
-      </td>
-      <td>{{ '%.4f'|format(t.lat) if t.lat else '—' }}</td>
-      <td>{{ '%.4f'|format(t.lon) if t.lon else '—' }}</td>
-      <td>{{ t.altitude|int if t.altitude else '—' }}</td>
-      <td>{{ t.speed|int if t.speed else '—' }}</td>
-      <td>{{ t.track|int if t.track else '—' }}</td>
-      <td>{{ '%.2f'|format(t.anomaly_score) if t.anomaly_score else '—' }}</td>
+      <td class="{{ t.status }}"><span class="badge">{{ t.status.upper() }}</span></td>
+      <td>{{ '%.4f'|format(t.lat) if t.lat is not none else '—' }}</td>
+      <td>{{ '%.4f'|format(t.lon) if t.lon is not none else '—' }}</td>
+      <td>{{ t.altitude|int if t.altitude is not none else '—' }}</td>
+      <td>{{ t.speed|int if t.speed is not none else '—' }}</td>
+      <td>{{ t.track|int if t.track is not none else '—' }}</td>
+      <td>{{ '%.2f'|format(t.anomaly_score) if t.anomaly_score is not none else '—' }}</td>
       <td style="font-size:.75em;color:#888">
         {{ (t.structural_reasons + ([t.anomaly_reason] if t.anomaly_reason else []))|join(', ') or '—' }}
       </td>
     </tr>
     {% endfor %}
   </table>
+
+  <script>
+    // Leaflet map — dark tiles
+    var map = L.map('map', {zoomControl: true}).setView([30, 0], 2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 18
+    }).addTo(map);
+
+    var statusColor = {valid:'#00ff41', suspicious:'#ff4444', unverified:'#ffaa00', invalid:'#555'};
+    var markers = {};
+
+    function refreshTraces() {
+      fetch('/api/traces')
+        .then(r => r.json())
+        .then(traces => {
+          var seen = new Set();
+          traces.forEach(t => {
+            if (t.lat == null || t.lon == null) return;
+            seen.add(t.hex);
+            var color = statusColor[t.status] || '#888';
+            var label = (t.flight || t.hex).trim();
+            var popup = '<b>' + label + '</b><br/>'
+              + 'Status: <span style="color:' + color + '">' + t.status.toUpperCase() + '</span><br/>'
+              + 'Alt: ' + (t.altitude ? Math.round(t.altitude) + ' ft' : '—') + '<br/>'
+              + 'Speed: ' + (t.speed ? Math.round(t.speed) + ' kt' : '—') + '<br/>'
+              + (t.anomaly_score != null ? 'Anomaly: ' + t.anomaly_score.toFixed(2) + '<br/>' : '')
+              + (t.anomaly_reason ? '<em>' + t.anomaly_reason + '</em>' : '');
+
+            if (markers[t.hex]) {
+              markers[t.hex].setLatLng([t.lat, t.lon])
+                .setStyle({color: color, fillColor: color})
+                .setPopupContent(popup);
+            } else {
+              markers[t.hex] = L.circleMarker([t.lat, t.lon], {
+                radius: 6, color: color, fillColor: color,
+                fillOpacity: 0.85, weight: 1.5
+              }).bindPopup(popup).addTo(map);
+            }
+          });
+          // Remove stale markers
+          Object.keys(markers).forEach(hex => {
+            if (!seen.has(hex)) { map.removeLayer(markers[hex]); delete markers[hex]; }
+          });
+        }).catch(() => {});
+    }
+
+    refreshTraces();
+    setInterval(refreshTraces, 5000);
+  </script>
 </body>
 </html>
 """

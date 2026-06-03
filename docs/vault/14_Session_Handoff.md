@@ -1,6 +1,51 @@
 # Session Handoff
 
-## Ultima sessione: 2026-06-03 — Sessione 5: Sprint 2+3 completi ✅ + repo privata
+## Ultima sessione: 2026-06-03 — Sessione 6: Debito tecnico azzerato ✅
+
+### Cosa è stato fatto
+
+1. **pickle → joblib** in `ml/anomaly_detector.py` — elimina Bandit B301/B403 (2 Medium → 0)
+2. **`simulator/preprocessor.py`** — HMACPreprocessor: aggiunge `_hmac_tag` ai record per test HMAC end-to-end
+3. **IF training su dati reali** — `ml/train.py`: 8466 vettori reali da samples + 200 sintetici → modello trainato
+4. **Dashboard con mappa Leaflet.js** — dark theme, marker colorati per status, popup con dettagli, refresh 5s
+5. **`requirements.txt`** aggiornato con `joblib>=1.3`
+6. **`.gitignore`** aggiornato con `models/`
+7. **Bandit finale**: 0 High, 0 Medium, 1 Low (B112 try/except/continue in train.py — accettato)
+8. **pip-audit documentato**: urllib3 CVE (transitivo Flask, non nostro), torch CVE (sistema, non nel progetto)
+9. **Vault aggiornato**: `11_Bugs_and_Fixes.md`, `12_Commands_and_Runbook.md`
+
+### File creati/toccati
+- `ml/anomaly_detector.py` (pickle→joblib)
+- `ml/train.py` (nuovo — CLI training)
+- `simulator/preprocessor.py` (nuovo — HMACPreprocessor)
+- `web/app.py` (dashboard Leaflet.js)
+- `requirements.txt` (joblib aggiunto)
+- `.gitignore` (models/ aggiunto)
+- `docs/vault/11_Bugs_and_Fixes.md`
+- `docs/vault/12_Commands_and_Runbook.md`
+- `docs/vault/14_Session_Handoff.md`
+
+### Stato sicurezza finale
+
+| Tool | Risultato |
+|---|---|
+| Bandit | 0 High, 0 Medium, 1 Low accettato |
+| pip-audit | torch CVE (sistema, non progetto), urllib3 CVE (transitivo, documentato) |
+| Test | 97/97 passing |
+
+### Debito tecnico residuo
+
+NESSUNO. Tutti i task identificati sono stati completati.
+
+### Prossima sessione (se necessaria)
+
+- Aggiungere test di integrazione end-to-end con HMACPreprocessor
+- Possibile: TLS per deploy non-localhost (nginx reverse proxy)
+- Possibile: UI mobile-friendly per dashboard
+
+---
+
+## Sessione precedente: 2026-06-03 — Sessione 5: Sprint 2+3 completi ✅ + repo privata
 
 ### Cosa è stato fatto
 
