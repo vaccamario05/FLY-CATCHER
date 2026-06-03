@@ -1,149 +1,173 @@
-<p align="center">
-  <img width="200" src="https://github.com/ANG13T/fly-catcher/blob/main/assets/logo.png" alt="Fly Catcher logo" />
-</p>
-<h1 align="center" style="font-size:50px !important;">Fly Catcher</h1>
-<p align="center">
-  <i>Fly Catcher monitors for malicious ADS-B signals in the 1090MHz frequency to detect for aircraft spoofing</i>
-   <br/><br/>
-  <b><a href="#features-️">Learn More</a></b> | <b><a href="#build-it-yourself-️">Build Guide</a></b> | <b><a href="#detecting-for-spoofing-">Getting Started</a></b> | <b><a href="https://youtube.com/watch?v=NJ9ep0IlddA">Video</a></b> | <b><a href="https://github.com/ANG13T/fly-catcher/blob/main/assets/project_report.pdf">Research Paper</a></b> | <b><a href="https://medium.com/@angelinatsuboi/detecting-hacker-aircraft-using-artificial-intelligence-ec249baa866b">Article</a></b>
-  <br/><br/>
-</p>
+# ADS-B Secure
 
-<details>
-  <summary><b>Table of Contents</b></summary>
-  <p>
-  
-- **Getting Started**
-  - [✈️ Features](#features-️)
-  - [⚡ Demo Gallery](#demo-gallery-️)
-  - [⚙️ Build it Yourself](#build-it-yourself-️)
-  - [🚀 Getting Started](#detecting-for-spoofing-)
-  - [🔎 Detecting for Spoofing](#detecting-for-spoofing-)
-- **Learning More**
-  - [🎥 Watch it in Action](#watch-it-in-action-)
-  - [🔬 Read the Research Paper](https://github.com/ANG13T/fly-catcher/blob/main/assets/project_report.pdf)
-  - [📄 Read the Article](https://medium.com/@angelinatsuboi/detecting-hacker-aircraft-using-artificial-intelligence-ec249baa866b)
-- **Community**
-  - [✨ Contributing](#contributing-)
-  - [🏆 Special Thanks & Credits](#special-thanks--credits-)
-  - [💜 Support](#support-)
-  - [📜 License](https://github.com/ANG13T/fly-catcher/blob/main/LICENSE)
-    
-  </p>
-</details>
+> **Protecting Air Traffic. Securing the Skies.**
 
-## Features ✈️
-- 🔎  Detecting spoofed ADS-B messages
-- 📡  Logging messages on the 1090 MHz frequency
-- ✈️  Mapping and visualizing ADS-B messages
-- ⚙️  A portable Raspberry-Pi based device
-- ⚡️  An accurate neural network classifier
-- 🔨  3D printable case with small form factor
-- 📻  Compatible with the FlightAware SDR
+ADS-B Secure è un security hardening layer per sistemi di monitoraggio del traffico aereo basati su ADS-B. Costruito come estensione modulare sopra [Fly-catcher](https://github.com/ANG13T/fly-catcher), aggiunge validazione crittografica, anomaly detection e logging forense a un protocollo strutturalmente non autenticato.
 
-## Demo Gallery ⚡️
+---
 
-<table>
-  <tr>
-    <td valign="top"><img src="https://github.com/ANG13T/fly-catcher/blob/main/assets/display_1.png?raw=true" alt="Gallery Image" height="180" width="250"> <h4 align="center">Picture of the completed build</h4></td>
-    <td valign="top"><img src="https://github.com/ANG13T/fly-catcher/blob/main/assets/display_2.png?raw=true" alt="Gallery Image" height="180" width="250"> <h4 align="center">Device shown with the SportCruiser</h4></td>
-    <td valign="top"><img src="https://github.com/ANG13T/fly-catcher/blob/main/assets/display_3.png?raw=true" alt="Gallery Image" height="180" width="250"> <h4 align="center">Display shown on the TFT Screen</h4></td>
-  </tr>
-</table>
+## Contesto accademico
 
-## Watch it in Action 🎥
-Watch the video overview of Fly Catcher on YouTube
+| Campo | Valore |
+|---|---|
+| Università | Università degli Studi di Napoli Parthenope |
+| Dipartimento | Dipartimento di Ingegneria |
+| Corso | Ingegneria e Scienze Informatiche per la Cybersecurity |
+| Materia | Progettazione di Software Sicuro |
+| Docenti | Prof. Luigi Romano, Prof. Luigi Coppolino |
+| Anno accademico | 2025/2026 |
+| Autori | Rocco Rizzitano, Mario Vacca |
 
-[https://youtube.com/watch?v=NJ9ep0IlddA](https://youtube.com/watch?v=NJ9ep0IlddA)
+---
 
-## Build it Yourself ⚙️
+## Cos'è ADS-B e perché è vulnerabile
 
-###  Materials List
-- 1090MHz Rubber Ducky Antenna
-- Raspberry Pi 3B
-- FlightAware Pro Stick Plus SDR
-- 3.5 in TFT Screen
-- Portable Battery Charger
-- USB-C to Micro USB Cable
-- [Custom 3D Printed Case](https://github.com/ANG13T/fly-catcher/blob/main/fabrication/Device_Case.f3d)
-- SD Card
-- Rasbian Operating System
-- 4x 3/32 Screws
-- Python and Pip on Raspberry Pi
+ADS-B (Automatic Dependent Surveillance-Broadcast) è il protocollo aeronautico che trasmette posizione, velocità e identità degli aeromobili in broadcast radio a 1090 MHz. È usato globalmente per il monitoraggio del traffico aereo.
 
-<img src="https://github.com/ANG13T/fly-catcher/blob/main/assets/materials.png?raw=true" alt="Folium Map" width="400" />
+**Problema**: ADS-B è stato progettato senza meccanismi di autenticazione, integrità o cifratura. Chiunque con un ricevitore SDR può:
+- Iniettare aerei fantasma (ghost aircraft injection)
+- Modificare quota e velocità di aerei reali (altitude/velocity tampering)
+- Ritrasmettere pacchetti catturati in precedenza (replay attack)
+- Saturare la pipeline di ricezione (packet flooding / DoS)
 
-### Constructing the Device
-1. Install the Rasbian operating system to the Raspberry Pi with the SD Card
-2. Connect the Flight Aware SDR to the Raspberry Pi using the Micro USB cable
-3. Connect the 1090 MHz antenna to the Flight Aware SDR
-4. Configure the 3.5-inch TFT Screen to the Raspberry Pi
-5. Place the Device into the 3D Printed Case
-6. Ensure Python and Pip are installed on the Raspberry Pi
-7. Install dump-1090 FlightAware library on the Raspberry Pi to receive ADS-B
-information
+**Soluzione**: ADS-B Secure introduce un layer software di controllo a valle della ricezione che rileva e mitiga queste minacce senza modificare il protocollo aeronautico reale.
 
-#### The following tutorial is very helpful for getting dump-1090 installed on the Pi
-[https://www.stuffaboutcode.com/2015/11/raspberry-pi-piaware-aircraft-radar.html](https://www.stuffaboutcode.com/2015/11/raspberry-pi-piaware-aircraft-radar.html)
+---
 
-### Running the Radar Code
+## Architettura
 
-Clone the Repository on the Pi
 ```
-git clone https://github.com/ANG13T/fly-catcher.git
+[dump1090 / Simulatore JSON]
+        ↓ raw ADS-B packets (untrusted)
+[RateLimiter]          → blocca flooding (token bucket)
+[StructuralValidator]  → verifica formato, range fisici
+[HMACValidator]        → integrità payload (PoC, chiave pre-condivisa)
+[ReplayDetector]       → timestamp window + deduplicazione
+[Classifier]           → TraceStatus: VALID / SUSPICIOUS / UNVERIFIED / INVALID
+[AnomalyDetector]      → Isolation Forest su feature cinematiche
+[ForensicLogger]       → JSONL append-only, SHA-256 hash chaining
+        ↓
+[Flask Dashboard]      → mappa Leaflet.js + RBAC operator/analyst
 ```
 
-Run the Program
+---
+
+## Funzionalità
+
+### Foundation Layer
+- Acquisizione da dump1090 HTTP API o simulatore JSON (senza hardware SDR)
+- Normalizzazione campi ADS-B con gestione varianti dump1090 e ADSB Exchange
+- Simulatore offline con replay di campioni reali
+
+### Security Layer
+- **Validazione strutturale**: ICAO format, lat/lon range, altitude, speed, track, flight callsign
+- **HMAC-SHA256 (PoC)**: verifica integrità payload su dati simulati/preprocessati con chiave da env
+- **Replay detection**: finestra temporale configurabile + bounded dedup set
+- **Rate limiting**: token bucket configurabile via env (`RATE_LIMIT_PPS`)
+- **Logging forense**: JSONL append-only con SHA-256 hash chaining tamper-evident
+- **Auth e RBAC**: ruoli operator/analyst, password PBKDF2-SHA256, session timeout 30 min
+
+### Intelligence Layer
+- **Feature extraction**: delta posizione/velocità/quota, haversine distance, speed discrepancy
+- **Isolation Forest**: anomaly detection non supervisionato (scikit-learn), score continuo
+- **Training su dati reali**: ~8.500 record da campioni ADSB Exchange + augmentazione sintetica
+- **Dashboard Leaflet.js**: marker colorati per status (verde/arancione/rosso), popup con dettagli
+
+---
+
+## Limiti dichiarati del prototipo
+
+- HMAC opera **solo su dati simulati/preprocessati** — non modifica il protocollo ADS-B reale
+- Il sistema opera **solo in ricezione**, mai in trasmissione (vincolo RE-01)
+- MLAT, TESLA completo e PKI distribuita sono fuori scope
+- Il prototipo non è certificato per uso operativo aeronautico
+
+---
+
+## Avvio rapido
+
+**Requisiti**: Python 3.11+
+
+```bash
+# 1. Installa dipendenze
+python3.11 -m pip install -r requirements.txt
+
+# 2. Addestra Isolation Forest (solo la prima volta)
+python3.11 -m ml.train --samples notebook/samples --augment 200
+
+# 3. Avvia pipeline + dashboard
+export ADSB_HMAC_KEY=$(python3.11 -c 'import secrets; print(secrets.token_hex(32))')
+python3.11 -m adsb_secure --mode simulator
 ```
-python3 fly-catcher/device-rpi/piawareradar.py longitude latitude
+
+Apri `http://localhost:5000` e accedi con:
+
+| Utente | Password | Accesso |
+|---|---|---|
+| `operator` | `operator123` | Dashboard + tracce |
+| `analyst` | `analyst123` | Dashboard + log forensi + export CSV |
+
+### Demo attacchi
+
+```bash
+# In un secondo terminale (chiave generata automaticamente)
+python3.11 -m demo.inject_attack --attack all
 ```
-Replace longitude and latitude with your [geo-coordinates](https://www.gps-coordinates.net/)
 
-## Detecting for Spoofing 🔎
+Scenari disponibili: `ghost` · `ghost_valid` · `replay` · `tamper` · `flood`
 
-### Download the Jupyter Notebook
+---
+
+## Test e qualità
+
+```bash
+# Suite completa (97 test)
+python3.11 -m pytest tests/ -v
+
+# Static analysis
+python3.11 -m bandit -r adsb_secure/ security/ ml/ web/ -f txt
+# → 0 High, 0 Medium, 1 Low (B112 accettato)
 ```
-git clone https://github.com/ANG13T/fly-catcher.git
-cd notebook
-jupyter notebook
+
+---
+
+## Struttura repository
+
 ```
-Install [Jupyter Notebook](https://jupyter.org/install) if you do not have it
+adsb_secure/       pipeline principale (acquisition, normalizer, trace_store)
+security/          validator, hmac_validator, replay_detector, rate_limiter,
+                   forensic_logger, classifier
+ml/                feature_extractor, anomaly_detector, train
+web/               Flask app (dashboard, auth RBAC)
+simulator/         JSONSimulator, HMACPreprocessor
+demo/              inject_attack.py, start_demo.sh, demo_script.md
+tests/             97 test (10 moduli)
+docs/vault/        Vault Obsidian — memoria persistente del progetto
+docs/appendice_tecnica.md  appendice tecnica per documentazione accademica
+device-rpi/        Fly-catcher originale (display legacy su Raspberry Pi)
+notebook/          notebook ML originali Fly-catcher (solo riferimento)
+```
 
-### Open up the localhost server at `http://localhost:8888`
+---
 
-### Download JSON Flight Logs from Device
-Visit the IP address of the Raspberry Pi device followed by the path `/data/aircraft.json`
-For example, `192.168.1.114:8080/data/aircraft.json`
+## Progetto basato su Fly-catcher
 
-<img src="https://github.com/ANG13T/fly-catcher/blob/main/assets/flight_log_screenshot.png?raw=true" alt="Folium Map" width="400" />
+Questo progetto accademico usa [Fly-catcher](https://github.com/ANG13T/fly-catcher) di
+**Angelina Tsuboi** come punto di partenza per la ricezione e visualizzazione di base
+dei dati ADS-B. Fly-catcher è distribuito con licenza MIT (Copyright © 2023 Angelina Tsuboi).
 
-### Open `Fly_Catcher.ipynb` and Run the Notebook
+Il codice originale di Fly-catcher è preservato nelle directory `device-rpi/` e `notebook/`
+senza modifiche sostanziali (salvo piccoli bug fix documentati).
 
-<img src="https://github.com/ANG13T/fly-catcher/blob/main/assets/folium_map.png?raw=true" alt="Folium Map" width="400" />
+Tutte le estensioni di sicurezza e intelligenza sviluppate per questo progetto
+(`adsb_secure/`, `security/`, `ml/`, `web/`, `simulator/`, `tests/`, `demo/`)
+sono lavoro originale degli autori e sono distribuite con licenza MIT separata.
 
-## Research Paper 🔬
-To get a more in-depth and technical overview of Fly Catcher, you can refer to this [research paper](https://github.com/ANG13T/fly-catcher/blob/main/assets/project_report.pdf).
+---
 
-You can also read an article write-up I made about Fly Catcher [here](https://medium.com/@angelinatsuboi/detecting-hacker-aircraft-using-artificial-intelligence-ec249baa866b).
+## Licenza
 
-## Future Improvements 🚀
-- Enhanced UI features on the radar screen 
-- Deep learning techniques such as RNNs and LSTM networks
-- Incorporating reinforcement learning techniques
-- Differentiate spoofing attacks (ie. GPS spoofing, aircraft masquerading, etc)
+Vedi [LICENSE](LICENSE) per il testo completo.
 
-## Contributing ✨
-Fly Catcher is open to any contributions. Please fork the repository and make a pull request with the features or fixes you want to implement.
-
-## Special Thanks & Credits 🏆
-The Fly Catcher leveraged on previous ADS-B works and references included below
-
-- [Pi Aware Radar by Martin O'Hanlon](http://www.stuffaboutcode.com/2015/11/raspberry-pi-piaware-aircraft-radar.html)
-- [Reference dump1090 README](https://github.com/SDRplay/dump1090/blob/master/README-json.md)
-- [Data Samples from ADSB Exchange](https://www.adsbexchange.com/data-samples/)
-- [IEEE Research on ADS-B Signals](https://ieeexplore.ieee.org/document/9377975)
-
-## Support 💜
-If you enjoyed Fly Catcher, please consider becoming a sponsor in order to fund my future projects.
-
-To check out my other works, visit my [GitHub profile](github.com/ANG13T).
+- Codice Fly-catcher originale: **MIT** — Copyright © 2023 Angelina Tsuboi
+- Estensioni ADS-B Secure: **MIT** — Copyright © 2025-2026 Rocco Rizzitano, Mario Vacca — Università Parthenope Napoli

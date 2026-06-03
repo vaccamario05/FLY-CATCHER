@@ -1,3 +1,15 @@
+LICENSES
+========
+
+This repository contains code from two distinct sources, each with its own copyright.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1 — FLY-CATCHER (Original Foundation)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Files covered: device-rpi/, notebook/
+Source: https://github.com/ANG13T/fly-catcher
+
 MIT License
 
 Copyright (c) 2023 Angelina Tsuboi
@@ -19,3 +31,61 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2 — ADS-B SECURE EXTENSIONS (Academic Project Work)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Files covered:
+  adsb_secure/    security/    ml/    web/    simulator/
+  tests/          demo/        docs/  CLAUDE.md  .claude/
+  requirements.txt  pytest.ini  .gitignore
+
+MIT License
+
+Copyright (c) 2025-2026 Rocco Rizzitano, Mario Vacca
+
+Università degli Studi di Napoli Parthenope
+Dipartimento di Ingegneria
+Corso di Laurea in Ingegneria e Scienze Informatiche per la Cybersecurity
+Project Work — Progettazione di Software Sicuro
+A.A. 2025/2026
+
+Supervisori: Prof. Luigi Romano, Prof. Luigi Coppolino
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DISCLAIMER — SCOPE OF USE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ADS-B Secure is a research and educational prototype developed for academic
+purposes. It is NOT certified for operational aeronautical use and MUST NOT
+be used in any safety-critical aviation context.
+
+The HMAC verification component operates exclusively on simulated or
+pre-processed data and does not modify, extend, or interfere with the
+real ADS-B radio protocol as defined by ICAO Annex 10 and DO-260B.
+
+The system operates in receive-only mode. It does not transmit ADS-B
+signals under any circumstances.
+
+Use of this software for offensive purposes, interference with real
+aeronautical systems, or any application that violates applicable
+aeronautical regulations is strictly prohibited.
