@@ -34,15 +34,16 @@
 
 ```
 Foundation Layer  [x] COMPLETATO — commit 3e094c5
-Security Layer    [ ] Non iniziato (Sprint 2)
-Intelligence Layer[ ] Non iniziato (Sprint 3)
+Security Layer    [x] COMPLETATO — commit 91d978a
+Intelligence Layer[x] COMPLETATO — commit 91d978a
 Vault             [x] Aggiornato
 Feasibility       [x] Completato
-Sprint Plan       [x] Approvato
+Sprint Plan       [x] Completato
 Claude OS         [x] CLAUDE.md + agents + skills + hooks
 ADR-001 Flask     [x] APPROVATO — implementato
-Tests             [x] 35/35 passing
+Tests             [x] 97/97 passing
 Bandit            [x] 1 Medium residuo (B104, accettato)
+Repo              [x] github.com/vaccamario05/FLY-CATCHER (privata)
 ```
 
 ## Architettura confermata

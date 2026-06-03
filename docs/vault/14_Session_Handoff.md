@@ -1,6 +1,67 @@
 # Session Handoff
 
-## Ultima sessione: 2026-06-03 — Sessione 4: Sprint 1 implementato ✅
+## Ultima sessione: 2026-06-03 — Sessione 5: Sprint 2+3 completi ✅ + repo privata
+
+### Cosa è stato fatto
+
+1. **Repo privata `vaccamario05/FLY-CATCHER`** creata su GitHub — tutto pushato
+2. **Sprint 2 Security Layer** — commit `91d978a`:
+   - `security/hmac_validator.py` — HMAC-SHA256 PoC, timing-safe
+   - `security/replay_detector.py` — window 30s + bounded dedup (maxlen=10000)
+   - `security/rate_limiter.py` — token bucket thread-safe
+   - `security/forensic_logger.py` — JSONL append-only + SHA-256 chain
+   - `security/classifier.py` — aggrega check → TraceStatus finale
+   - `web/auth.py` — RBAC operator/analyst, PBKDF2 passwords, session timeout
+   - `web/app.py` aggiornato — auth su tutte le route, /api/audit/*, /api/export/csv
+   - `adsb_secure/__main__.py` — pipeline completa Sprint 2 wired
+3. **Sprint 3 Intelligence Layer** — stesso commit:
+   - `ml/feature_extractor.py` — haversine, delta cinematici, speed discrepancy
+   - `ml/anomaly_detector.py` — Isolation Forest, model persistence, explain
+   - `ml/train_from_samples()` — bootstrap da notebook/samples/
+4. **97/97 test verdi** — Sprint 1+2+3 coperti
+5. **Vault e repo aggiornati**
+
+### Struttura finale implementata
+
+```
+adsb_secure/    acquisition, normalizer, trace_store, pipeline, __main__
+security/       validator, hmac_validator, replay_detector, rate_limiter,
+                forensic_logger, classifier
+ml/             feature_extractor, anomaly_detector
+web/            app (Flask), auth (RBAC)
+simulator/      replay (JSONSimulator)
+tests/          97 test (10 file)
+```
+
+### Avvio completo
+
+```bash
+# Simulatore + pipeline + dashboard
+ADSB_HMAC_KEY=$(python3.11 -c 'import secrets; print(secrets.token_hex(32))') \
+python3.11 -m adsb_secure --mode simulator
+# http://localhost:5000 → login (operator/operator123 o analyst/analyst123)
+```
+
+### Debito tecnico residuo (da fare)
+
+- [ ] Script training IF da campioni reali (attualmente usa dati sintetici)
+- [ ] Preprocessore simulatore che aggiunge `_hmac_tag` ai record (per test HMAC in pipeline live)
+- [ ] Dashboard mappa geografica (Leaflet.js o similar)
+- [ ] Rate limiter configurazione fine-grained per-ICAO
+- [ ] TLS per deploy non-localhost
+- [ ] pip-audit run completo e documentazione CVE trovati
+- [ ] Bandit scan Sprint 2+3 modules
+
+### Next steps (prossima sessione)
+
+1. Run `python3.11 -m bandit -r security/ ml/ web/ -f txt` → documentare findings
+2. Run `python3.11 -m pip-audit` → documentare CVE
+3. Train IF su dati reali se disponibili
+4. Aggiungere preprocessore simulatore con `_hmac_tag` per test pipeline end-to-end con HMAC
+
+---
+
+## Sessione precedente: 2026-06-03 — Sessione 4: Sprint 1 implementato ✅
 
 ### Cosa è stato fatto
 
