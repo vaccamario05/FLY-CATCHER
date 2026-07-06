@@ -236,7 +236,7 @@ _DASHBOARD_HTML = """
               + 'Track: ' + (t.track != null ? Math.round(t.track) + '&deg;' : '—') + '<br/>'
               + (t.anomaly_score != null ? 'Anomaly: ' + t.anomaly_score.toFixed(2) + '<br/>' : '')
               + (reasons.length ? '<em>' + escapeHtml(reasons.join(', ')) + '</em><br/>' : '')
-              + '<a href="#" onclick="showDetail(\'' + escapeHtml(t.hex) + '\'); return false;">Dettagli completi &rarr;</a>';
+              + '<a href="#" onclick="showDetail(&quot;' + escapeHtml(t.hex) + '&quot;); return false;">Dettagli completi &rarr;</a>';
 
             if (markers[t.hex]) {
               markers[t.hex].setLatLng([t.lat, t.lon])
