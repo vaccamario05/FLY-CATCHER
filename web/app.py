@@ -150,6 +150,9 @@ _DASHBOARD_HTML = """
 
     var statusColor = {valid:'#00ff41', suspicious:'#ff4444', unverified:'#ffaa00', invalid:'#555'};
     var markers = {};
+    var trails = {};       // hex -> array of [lat, lon] visited this session
+    var trailLines = {};   // hex -> L.polyline
+    var MAX_TRAIL_POINTS = 50;
 
     function planeIcon(color, trackDeg) {
       var rot = (trackDeg == null) ? 0 : trackDeg;
@@ -194,9 +197,29 @@ _DASHBOARD_HTML = """
               markers[t.hex] = L.marker([t.lat, t.lon], {icon: planeIcon(color, t.track)})
                 .bindPopup(popup).addTo(map);
             }
+
+            // Route trail: accumulate positions seen this session (client-side,
+            // no backend history endpoint needed) and draw as a polyline.
+            var trail = trails[t.hex] || (trails[t.hex] = []);
+            var last = trail[trail.length - 1];
+            if (!last || last[0] !== t.lat || last[1] !== t.lon) {
+              trail.push([t.lat, t.lon]);
+              if (trail.length > MAX_TRAIL_POINTS) trail.shift();
+            }
+            if (trailLines[t.hex]) {
+              trailLines[t.hex].setLatLngs(trail).setStyle({color: color});
+            } else if (trail.length > 1) {
+              trailLines[t.hex] = L.polyline(trail, {
+                color: color, weight: 2, opacity: 0.55, dashArray: '4,4'
+              }).addTo(map);
+            }
           });
           Object.keys(markers).forEach(hex => {
-            if (!seen.has(hex)) { map.removeLayer(markers[hex]); delete markers[hex]; }
+            if (!seen.has(hex)) {
+              map.removeLayer(markers[hex]); delete markers[hex];
+              if (trailLines[hex]) { map.removeLayer(trailLines[hex]); delete trailLines[hex]; }
+              delete trails[hex];
+            }
           });
         }).catch(() => {});
     }
