@@ -323,6 +323,15 @@ _ANALYST_HTML = """
       return new Date(t * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     }
 
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     var sevOrder = {low:0, medium:1, high:2, critical:3};
 
     function loadEvents() {
@@ -367,15 +376,15 @@ _ANALYST_HTML = """
       });
 
       var rows = sorted.map(function(e) {
-        var det = JSON.stringify(e.details || {});
-        var detSafe = det.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        var det = escapeHtml(JSON.stringify(e.details || {}));
+        var sev = escapeHtml((e.severity || 'low').toLowerCase());
         return '<tr>'
-          + '<td>' + fmtTs(e.timestamp) + '</td>'
-          + '<td>' + (e.event_type || '—') + '</td>'
-          + '<td class="sev-' + (e.severity||'low') + '">' + (e.severity || '—').toUpperCase() + '</td>'
-          + '<td>' + (e.icao || '—') + '</td>'
-          + '<td class="details" title="' + detSafe + '">' + det + '</td>'
-          + '<td style="color:#2a2a2a;font-size:.7em">' + (e.id || '').slice(0, 8) + '&hellip;</td>'
+          + '<td>' + escapeHtml(fmtTs(e.timestamp)) + '</td>'
+          + '<td>' + escapeHtml(e.event_type || '—') + '</td>'
+          + '<td class="sev-' + sev + '">' + escapeHtml((e.severity || '—').toUpperCase()) + '</td>'
+          + '<td>' + escapeHtml(e.icao || '—') + '</td>'
+          + '<td class="details" title="' + det + '">' + det + '</td>'
+          + '<td style="color:#2a2a2a;font-size:.7em">' + escapeHtml((e.id || '').slice(0, 8)) + '&hellip;</td>'
           + '</tr>';
       });
       document.getElementById('events-body').innerHTML = rows.join('');
