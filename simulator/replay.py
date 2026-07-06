@@ -44,6 +44,7 @@ class JSONSimulator:
         self.loop = loop
         self._records: list[dict] = []
         self._loaded = False
+        self._cycle = 0
 
     def _load(self) -> None:
         with open(self.file_path, "r", encoding="utf-8") as f:
@@ -51,6 +52,16 @@ class JSONSimulator:
         aircraft = data.get("aircraft", [])
         if not isinstance(aircraft, list):
             raise ValueError(f"Expected 'aircraft' list in {self.file_path}")
+
+        if self.loop and self._loaded:
+            # A real feed refreshes 'seen' on every poll even for a static
+            # snapshot. Re-reading the identical file verbatim on every loop
+            # would make every subsequent cycle look like an exact replay of
+            # the previous one to ReplayDetector's deduplication (same hex,
+            # seen, lat, lon) — nudge 'seen' so each cycle is distinguishable.
+            self._cycle += 1
+            aircraft = [dict(rec, seen=self._cycle * 0.001) for rec in aircraft]
+
         self._records = aircraft
         self._loaded = True
         logger.info("Simulator loaded %d records from %s", len(aircraft), self.file_path)
