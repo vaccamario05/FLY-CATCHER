@@ -425,7 +425,8 @@ def _build_alerts(traces) -> list:
     return alerts
 
 
-def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_interval=5.0) -> Flask:
+def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_interval=5.0,
+               rate_limiter=None, replay_detector=None) -> Flask:
     """
     Flask application factory.
 
@@ -433,6 +434,8 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
     :param forensic_logger: ForensicLogger instance for audit routes.
     :param heartbeat: 1-item list holding last pipeline cycle timestamp (liveness probe).
     :param pipeline_interval: expected pipeline cycle interval, used to size the liveness window.
+    :param rate_limiter: live TokenBucketRateLimiter shared with pipeline (for threshold config).
+    :param replay_detector: live ReplayDetector shared with pipeline (for threshold config).
     """
     app = Flask(__name__)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32))
@@ -445,12 +448,24 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
     app.forensic_logger = forensic_logger
     app.heartbeat = heartbeat
     app.pipeline_interval = pipeline_interval
+    app.rate_limiter = rate_limiter
+    app.replay_detector = replay_detector
 
     from web.auth import auth_bp
     app.register_blueprint(auth_bp)
 
     from web.auth import require_auth, require_role
     from security.forensic_logger import SecurityEvent, EventType, Severity
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return e
+        logger.exception("Unhandled exception on %s", request.path)
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "internal_server_error"}), 500
+        return "Internal Server Error", 500
 
     # ------------------------------------------------------------------ #
     # Public routes
@@ -652,5 +667,81 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
             mimetype="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={fname}"},
         )
+
+    # ------------------------------------------------------------------ #
+    # Security threshold configuration — analyst only (least privilege)
+    # ------------------------------------------------------------------ #
+
+    @app.get("/api/config/thresholds")
+    @require_role("analyst")
+    def api_get_thresholds():
+        from ml import anomaly_detector as anomaly_detector_module
+        return jsonify({
+            "alert_min_severity": _ALERT_MIN_SEVERITY,
+            "anomaly_threshold": anomaly_detector_module._ANOMALY_THRESHOLD,
+            "rate_limit_pps": app.rate_limiter.pps if app.rate_limiter else None,
+            "replay_window_seconds": app.replay_detector.window if app.replay_detector else None,
+        })
+
+    @app.post("/api/config/thresholds")
+    @require_role("analyst")
+    def api_set_thresholds():
+        global _ALERT_MIN_SEVERITY
+        from ml import anomaly_detector as anomaly_detector_module
+
+        payload = request.get_json(silent=True) or {}
+        changes = {}
+
+        if "alert_min_severity" in payload:
+            value = str(payload["alert_min_severity"]).lower()
+            if value not in _SEVERITY_ORDER:
+                return jsonify({"error": "invalid alert_min_severity", "allowed": list(_SEVERITY_ORDER)}), 400
+            _ALERT_MIN_SEVERITY = value
+            changes["alert_min_severity"] = value
+
+        if "anomaly_threshold" in payload:
+            try:
+                value = float(payload["anomaly_threshold"])
+            except (TypeError, ValueError):
+                return jsonify({"error": "anomaly_threshold must be a number"}), 400
+            if not (0.0 <= value <= 1.0):
+                return jsonify({"error": "anomaly_threshold must be between 0 and 1"}), 400
+            anomaly_detector_module._ANOMALY_THRESHOLD = value
+            changes["anomaly_threshold"] = value
+
+        if "rate_limit_pps" in payload:
+            if not app.rate_limiter:
+                return jsonify({"error": "rate_limiter_not_configured"}), 503
+            try:
+                value = int(payload["rate_limit_pps"])
+            except (TypeError, ValueError):
+                return jsonify({"error": "rate_limit_pps must be an integer"}), 400
+            if value <= 0:
+                return jsonify({"error": "rate_limit_pps must be positive"}), 400
+            app.rate_limiter.pps = value
+            changes["rate_limit_pps"] = value
+
+        if "replay_window_seconds" in payload:
+            if not app.replay_detector:
+                return jsonify({"error": "replay_detector_not_configured"}), 503
+            try:
+                value = float(payload["replay_window_seconds"])
+            except (TypeError, ValueError):
+                return jsonify({"error": "replay_window_seconds must be a number"}), 400
+            if value <= 0:
+                return jsonify({"error": "replay_window_seconds must be positive"}), 400
+            app.replay_detector.window = value
+            changes["replay_window_seconds"] = value
+
+        if not changes:
+            return jsonify({"error": "no valid fields provided"}), 400
+
+        if app.forensic_logger:
+            app.forensic_logger.log(SecurityEvent(
+                event_type=EventType.CONFIG_CHANGED,
+                severity=Severity.MEDIUM,
+                details={"changed_by": session.get("username", "?"), "changes": changes},
+            ))
+        return jsonify({"status": "ok", "changes": changes})
 
     return app

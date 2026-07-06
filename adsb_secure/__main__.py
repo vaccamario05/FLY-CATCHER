@@ -177,7 +177,10 @@ def main() -> None:
     pipeline_thread = threading.Thread(target=_pipeline_supervisor, daemon=True)
     pipeline_thread.start()
 
-    flask_app = create_app(trace_store=trace_store, forensic_logger=forensic_logger, heartbeat=heartbeat, pipeline_interval=args.interval)
+    flask_app = create_app(
+        trace_store=trace_store, forensic_logger=forensic_logger, heartbeat=heartbeat,
+        pipeline_interval=args.interval, rate_limiter=rate_limiter, replay_detector=replay_detector,
+    )
     logger.info("Dashboard at http://localhost:%d", args.port)
     flask_app.run(host="0.0.0.0", port=args.port, debug=False)  # nosec B104
 

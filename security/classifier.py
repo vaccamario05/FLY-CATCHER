@@ -11,6 +11,7 @@ Decision logic:
 """
 
 from adsb_secure.normalizer import AirCraftData, TraceStatus
+from ml import anomaly_detector as _anomaly_detector_module
 
 
 def classify(aircraft: AirCraftData) -> AirCraftData:
@@ -33,8 +34,11 @@ def classify(aircraft: AirCraftData) -> AirCraftData:
         aircraft.status = TraceStatus.SUSPICIOUS
         return aircraft
 
-    # Sprint 3: anomaly score threshold
-    if aircraft.anomaly_score is not None and aircraft.anomaly_score > 0.7:
+    # Sprint 3: anomaly score threshold — read live from ml.anomaly_detector so
+    # a runtime threshold change (analyst config) actually takes effect here,
+    # instead of this module keeping its own stale hardcoded value.
+    if (aircraft.anomaly_score is not None
+            and aircraft.anomaly_score > _anomaly_detector_module._ANOMALY_THRESHOLD):
         aircraft.status = TraceStatus.SUSPICIOUS
         return aircraft
 
