@@ -111,9 +111,13 @@ _DASHBOARD_HTML = """
       <option value="high">High e sopra</option>
       <option value="medium">Medium e sopra</option>
     </select>
+    <label style="margin-left:.8rem;font-size:.8em;color:#ff8888;cursor:pointer">
+      <input type="checkbox" id="hmac-alert-toggle" checked onchange="filterAlerts()">
+      Includi alert HMAC invalid
+    </label>
     <div id="alert-list">
     {% for a in alerts %}
-    <div class="alert-row" data-severity="{{ a.severity }}">
+    <div class="alert-row" data-severity="{{ a.severity }}" data-hmac="{{ 'yes' if 'hmac_invalid' in a.reasons else 'no' }}">
       <span class="sev-{{ a.severity }}">{{ a.severity.upper() }}</span>
       <a href="/api/aircraft/{{ a.icao }}">{{ a.icao }}</a>
       {% if a.flight %}<em>({{ a.flight }})</em>{% endif %}
@@ -245,9 +249,12 @@ _DASHBOARD_HTML = """
     function filterAlerts() {
       var mode = document.getElementById('alert-sev-filter').value;
       var minRank = mode === 'all' ? -1 : sevRank[mode];
+      var includeHmac = document.getElementById('hmac-alert-toggle').checked;
       var visible = 0;
       document.querySelectorAll('#alert-list .alert-row').forEach(function(row) {
-        var ok = minRank < 0 || (sevRank[row.dataset.severity] || 0) >= minRank;
+        var sevOk = minRank < 0 || (sevRank[row.dataset.severity] || 0) >= minRank;
+        var hmacOk = includeHmac || row.dataset.hmac !== 'yes';
+        var ok = sevOk && hmacOk;
         row.classList.toggle('hidden-by-filter', !ok);
         if (ok) visible++;
       });
