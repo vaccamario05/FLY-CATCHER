@@ -618,7 +618,7 @@ _ANALYST_HTML = """
     }
 
     function checkChain() {
-      fetch('/api/audit/verify')
+      return fetch('/api/audit/verify')
         .then(r => r.json())
         .then(function(d) {
           var el = document.getElementById('chain-status');
@@ -626,13 +626,23 @@ _ANALYST_HTML = """
             el.innerHTML = '<div class="chain-ok">&#10003; Hash chain intact</div>';
           } else {
             el.innerHTML = '<div class="chain-broken">&#9888; CHAIN INTEGRITY BROKEN at record '
-              + d.broken_at_line + ' &mdash; log may have been tampered</div>';
+              + d.broken_at_line + ' &mdash; log may have been tampered. Event view disabled '
+              + 'until reviewed by an administrator.</div>';
           }
-        }).catch(function() {});
+          return d.chain_intact;
+        }).catch(function() { return true; });  // fail open on network error, not on detected tampering
     }
 
-    loadEvents();
-    checkChain();
+    checkChain().then(function(intact) {
+      if (intact) {
+        loadEvents();
+      } else {
+        document.querySelector('.filters').style.display = 'none';
+        document.getElementById('stats').textContent =
+          'Event log hidden: chain integrity check failed.';
+        document.getElementById('events-body').innerHTML = '';
+      }
+    });
   </script>
 </body>
 </html>
@@ -701,6 +711,7 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
     app.pipeline_interval = pipeline_interval
     app.rate_limiter = rate_limiter
     app.replay_detector = replay_detector
+    app._last_reported_break = None
 
     from web.auth import auth_bp
     app.register_blueprint(auth_bp)
@@ -805,6 +816,13 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
         if not app.forensic_logger:
             return jsonify({"error": "forensic_logger_not_configured"}), 503
         ok, broken_at = app.forensic_logger.verify_chain()
+        if not ok and app._last_reported_break != broken_at:
+            app._last_reported_break = broken_at
+            app.forensic_logger.log(SecurityEvent(
+                event_type=EventType.LOG_CHAIN_BROKEN,
+                severity=Severity.CRITICAL,
+                details={"broken_at_line": broken_at, "detected_by": session.get("username", "?")},
+            ))
         return jsonify({"chain_intact": ok, "broken_at_line": broken_at})
 
     @app.get("/api/export/csv")
