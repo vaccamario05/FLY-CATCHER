@@ -37,6 +37,12 @@ _USERS: dict[str, dict] = {
         ),
         "role": "operator",
     },
+    "supervisor": {
+        "password_hash": generate_password_hash(
+            os.environ.get("SUPERVISOR_PASSWORD", "supervisor123")
+        ),
+        "role": "supervisor",
+    },
     "analyst": {
         "password_hash": generate_password_hash(
             os.environ.get("ANALYST_PASSWORD", "analyst123")
@@ -123,7 +129,7 @@ def require_auth(f):
 
 def require_role(role: str):
     """Return 403 if authenticated user lacks required role."""
-    _ROLE_HIERARCHY = {"operator": 0, "analyst": 1}
+    _ROLE_HIERARCHY = {"operator": 0, "supervisor": 1, "analyst": 2}
 
     def decorator(f):
         @functools.wraps(f)
@@ -158,6 +164,9 @@ def login_post():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
 
+    from flask import current_app
+    flog = getattr(current_app, "forensic_logger", None)
+
     user = _USERS.get(username)
     if user and check_password_hash(user["password_hash"], password):
         session.clear()
@@ -165,12 +174,16 @@ def login_post():
         session["role"] = user["role"]
         session["last_active"] = time.time()
         logger.info("Login success: %s (role=%s)", username, user["role"])
+        if flog:
+            from security.forensic_logger import SecurityEvent, EventType, Severity
+            flog.log(SecurityEvent(
+                event_type=EventType.LOGIN_SUCCESS,
+                severity=Severity.LOW,
+                details={"username": username, "role": user["role"]},
+            ))
         return redirect(url_for("dashboard"))
 
     logger.warning("Login failed: username=%r", username)
-    # Log to forensic logger if available (injected via app)
-    from flask import current_app
-    flog = getattr(current_app, "forensic_logger", None)
     if flog:
         from security.forensic_logger import SecurityEvent, EventType, Severity
         flog.log(SecurityEvent(

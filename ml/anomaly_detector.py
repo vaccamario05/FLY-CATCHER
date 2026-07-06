@@ -50,6 +50,10 @@ class AnomalyDetector:
         # Try loading persisted model
         self._try_load()
 
+    @property
+    def is_trained(self) -> bool:
+        return self._trained
+
     def _try_load(self) -> None:
         try:
             if Path(_MODEL_PATH).exists() and Path(_SCALER_PATH).exists():

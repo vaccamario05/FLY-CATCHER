@@ -9,6 +9,7 @@ import logging
 import os
 import threading
 import time
+from typing import Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,7 +20,8 @@ logger = logging.getLogger("adsb_secure")
 
 def run_pipeline(acquisition, rate_limiter, validator, hmac_validator,
                  replay_detector, classifier, trace_store, forensic_logger,
-                 interval: float = 5.0) -> None:
+                 interval: float = 5.0, anomaly_detector=None,
+                 heartbeat: Optional[list] = None) -> None:
     from security.forensic_logger import SecurityEvent, EventType, Severity
 
     logger.info("Pipeline started (interval=%.1fs)", interval)
@@ -70,10 +72,22 @@ def run_pipeline(acquisition, rate_limiter, validator, hmac_validator,
                     details={"seen": aircraft.seen},
                 ))
 
-            # 5 — Final classification
+            # 5 — Kinematic anomaly detection (ghost aircraft / trajectory tampering)
+            if anomaly_detector is not None and aircraft.hex:
+                history = trace_store.get_history(aircraft.hex) + [aircraft]
+                aircraft = anomaly_detector.annotate(aircraft, history)
+                if aircraft.anomaly_score is not None and aircraft.anomaly_score > 0.7:
+                    forensic_logger.log(SecurityEvent(
+                        event_type=EventType.ANOMALY_DETECTED,
+                        severity=Severity.HIGH,
+                        icao=aircraft.hex,
+                        details={"score": aircraft.anomaly_score, "reason": aircraft.anomaly_reason},
+                    ))
+
+            # 6 — Final classification
             aircraft = classifier(aircraft)
 
-            # 6 — Store
+            # 7 — Store
             trace_store.update(aircraft)
             accepted += 1
 
@@ -84,6 +98,9 @@ def run_pipeline(acquisition, rate_limiter, validator, hmac_validator,
                     icao=aircraft.hex,
                     details={"status": aircraft.status.value},
                 ))
+
+        if heartbeat is not None:
+            heartbeat[0] = time.time()
 
         logger.info(
             "Cycle done: %d fetched, %d accepted, %d rate-dropped → %d traces",
@@ -115,6 +132,7 @@ def main() -> None:
     from security.rate_limiter import TokenBucketRateLimiter
     from security.classifier import classify
     from security.forensic_logger import ForensicLogger
+    from ml.anomaly_detector import AnomalyDetector
     from web.app import create_app
 
     trace_store = TraceStore()
@@ -122,6 +140,9 @@ def main() -> None:
     hmac_validator = HMACValidator()
     rate_limiter = TokenBucketRateLimiter()
     forensic_logger = ForensicLogger()
+    anomaly_detector = AnomalyDetector()
+    if not anomaly_detector.is_trained:
+        logger.warning("Anomaly model not trained/found — ghost/anomaly detection disabled this run")
 
     if args.mode == "simulator":
         from simulator.replay import JSONSimulator
@@ -139,15 +160,24 @@ def main() -> None:
         replay_detector = ReplayDetector()  # full check in live mode
         logger.info("Mode: live (%s)", args.url)
 
-    pipeline_thread = threading.Thread(
-        target=run_pipeline,
-        args=(acquisition, rate_limiter, validator, hmac_validator,
-              replay_detector, classify, trace_store, forensic_logger, args.interval),
-        daemon=True,
-    )
+    heartbeat = [time.time()]
+
+    def _pipeline_supervisor():
+        while True:
+            try:
+                run_pipeline(
+                    acquisition, rate_limiter, validator, hmac_validator,
+                    replay_detector, classify, trace_store, forensic_logger,
+                    args.interval, anomaly_detector=anomaly_detector, heartbeat=heartbeat,
+                )
+            except Exception:
+                logger.exception("Pipeline crashed — restarting in %.1fs", args.interval)
+                time.sleep(args.interval)
+
+    pipeline_thread = threading.Thread(target=_pipeline_supervisor, daemon=True)
     pipeline_thread.start()
 
-    flask_app = create_app(trace_store=trace_store, forensic_logger=forensic_logger)
+    flask_app = create_app(trace_store=trace_store, forensic_logger=forensic_logger, heartbeat=heartbeat, pipeline_interval=args.interval)
     logger.info("Dashboard at http://localhost:%d", args.port)
     flask_app.run(host="0.0.0.0", port=args.port, debug=False)  # nosec B104
 

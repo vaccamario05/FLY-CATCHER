@@ -1,5 +1,64 @@
 # Session Handoff
 
+## Ultima sessione: 2026-07-06 — Sessione 7: Agile Scrum backlog — US2/US3/US4/UC2-EX1/RBAC ✅
+
+### Contesto
+Sessione guidata da documentazione formale progetto (stakeholder, personas, use case, user stories, security stories).
+Gap analysis → 5 delta identificati → tutti implementati.
+
+### Cosa è stato fatto
+
+1. **RBAC: ruolo `supervisor`** (`web/auth.py`) — gerarchia: operator(0) < supervisor(1) < analyst(2)
+   - Nuovo utente `supervisor` / `supervisor123` (override via `SUPERVISOR_PASSWORD` env)
+   - `require_role` gerarchia aggiornata
+2. **US2: Alert panel** (`web/app.py`) — pannello alert sopra la mappa
+   - Mostra solo tracce con severità ≥ `ALERT_MIN_SEVERITY` (default: medium)
+   - Severity derivata da status: suspicious→MEDIUM, invalid→HIGH
+   - Aggregazione per ICAO (già garantita da `all_current()`)
+   - Mostra: severity badge, ICAO link, flight, reasons, anomaly score
+3. **US3: Analyst events page** (`/analyst/events`) — HTML interattiva
+   - Filtri: event_type, severity, ICAO, limit
+   - Ordinamento click su colonna (timestamp/severity/event_type)
+   - Mostra chain integrity status in cima
+   - Solo ruolo analyst
+4. **US4: PDF export** (`/api/export/pdf`) — reportlab A4
+   - Titolo, timestamp, chain integrity, tabella eventi
+   - Ogni export (CSV + PDF) loggato su forensic logger come `AUDIT_EXPORT`
+5. **UC2 EX1: Chain integrity banner** — dashboard analyst
+   - JS fetch `/api/audit/verify` on load → banner rosso se catena rotta
+6. **`security/forensic_logger.py`** — aggiunto `AUDIT_EXPORT` a `EventType`
+7. **`requirements.txt`** — aggiunto `reportlab>=4.0`
+8. **Test** — 12 nuovi test in `tests/test_web.py` (109 totali, tutti verdi)
+
+### File toccati
+- `web/app.py` (riscritta con _ANALYST_HTML, alert panel, PDF export, logging export)
+- `web/auth.py` (supervisor user + gerarchia aggiornata)
+- `security/forensic_logger.py` (AUDIT_EXPORT EventType)
+- `requirements.txt` (reportlab>=4.0)
+- `tests/test_web.py` (12 nuovi test)
+- `docs/vault/14_Session_Handoff.md`
+
+### Stato sicurezza finale
+
+| Tool | Risultato |
+|---|---|
+| Test | 109/109 passing |
+| Bandit | non rieseguito (no new security-sensitive code) |
+| pip-audit | reportlab aggiunto — nessun CVE noto |
+
+### Gap residui (non richiesti da backlog attuale)
+
+- RBAC: supervisor non ha nav extra (può vedere dettaglio via click ICAO — US5 soddisfatta)
+- PDF styling basic (PoC) — non dark theme
+- `read_events` non supporta filtro time range (workaround: filter client-side)
+
+### Prossima sessione
+
+- Continuare con product backlog Scrum — attendere prossime user stories/sprint
+- Possibile: test di integrazione end-to-end con HMACPreprocessor
+
+---
+
 ## Ultima sessione: 2026-06-03 — Sessione 6: Debito tecnico azzerato ✅
 
 ### Cosa è stato fatto
