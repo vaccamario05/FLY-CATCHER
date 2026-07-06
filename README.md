@@ -154,21 +154,38 @@ Nota: dati reali esterni non avranno mai un tag HMAC valido (nessun feed pubblic
 ### Demo attacchi
 
 ```bash
-# Script guidato (genera chiave HMAC e credenziali automaticamente)
+# Script guidato (genera chiave HMAC e credenziali automaticamente,
+# scenario --demo attivo di default: vedi sotto)
 ./demo/start_demo.sh
 
-# In un secondo terminale
+# In un secondo terminale, attacchi aggiuntivi
 python3.11 -m demo.inject_attack --attack all
 ```
 
-Scenari disponibili: `ghost` · `ghost_valid` · `replay` · `tamper` · `flood`
+Scenari `inject_attack.py` disponibili: `ghost` · `ghost_valid` · `replay` · `tamper` · `flood`
+
+### Scenario dimostrativo integrato (`--demo`)
+
+Il flag `--demo` (già attivo in `start_demo.sh`) inietta automaticamente, ad ogni ciclo, 5 aeromobili scriptati che coprono ogni path di classificazione — senza bisogno di un secondo terminale con `inject_attack.py`:
+
+| ICAO | Flight | Path attivato |
+|---|---|---|
+| `GHOST01` | GHOST01 | `INVALID` — ICAO malformato (fallisce regex strutturale) |
+| `abc123` | IMPOSS1 | `INVALID` — quota fuori range fisico |
+| `def456` | GHOST02 | `SUSPICIOUS` — ghost/anomaly ML (salto di posizione impossibile) |
+| `112233` | REPLAY1 | `SUSPICIOUS` — replay detection (pacchetto identico ogni ciclo) |
+| `445566` | TAMPER1 | `SUSPICIOUS` — hmac_fail (tag deliberatamente corrotto) |
+
+```bash
+python3.11 -m adsb_secure --mode simulator --demo
+```
 
 ---
 
 ## Test e qualità
 
 ```bash
-# Suite completa (128 test)
+# Suite completa (135 test)
 python3.11 -m pytest tests/ -v
 
 # Static analysis
@@ -189,7 +206,7 @@ ml/                feature_extractor, anomaly_detector, train
 web/               Flask app (dashboard, auth RBAC, config soglie, export audit)
 simulator/         JSONSimulator, HMACPreprocessor
 demo/              inject_attack.py, start_demo.sh, demo_script.md
-tests/             128 test (14 moduli, incl. perf, acquisition multi-provider, review workflow)
+tests/             135 test (15 moduli, incl. perf, acquisition multi-provider, review workflow, demo scenario)
 docs/vault/        Vault Obsidian — memoria persistente del progetto
 docs/appendice_tecnica.md  appendice tecnica per documentazione accademica
 device-rpi/        Fly-catcher originale (display legacy su Raspberry Pi)

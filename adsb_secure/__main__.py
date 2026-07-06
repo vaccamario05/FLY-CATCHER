@@ -137,6 +137,11 @@ def main() -> None:
     parser.add_argument("--url", default=os.environ.get("DUMP1090_URL", "http://localhost:8080/data/aircraft.json"))
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--interval", type=float, default=5.0)
+    parser.add_argument(
+        "--demo", action="store_true",
+        help="Simulator mode only: inject scripted INVALID/replay/anomaly/HMAC-fail "
+             "aircraft every cycle so every classification path is visibly active.",
+    )
     args = parser.parse_args()
 
     from adsb_secure.acquisition import DataIngestion
@@ -163,8 +168,16 @@ def main() -> None:
         from simulator.replay import JSONSimulator
         from simulator.preprocessor import HMACPreprocessor
         sim = JSONSimulator(args.file, loop=True)
+
+        tamper_icao = None
+        if args.demo:
+            from demo.scenario import DemoScenarioSimulator, HMAC_TAMPER_ICAO
+            sim = DemoScenarioSimulator(sim)
+            tamper_icao = HMAC_TAMPER_ICAO
+            logger.info("Demo scenario active — injecting scripted INVALID/replay/anomaly/HMAC-fail aircraft")
+
         # Sign records with HMAC tag if key is set
-        signed_sim = HMACPreprocessor(sim)
+        signed_sim = HMACPreprocessor(sim, tamper_icao=tamper_icao)
         acquisition = DataIngestion(simulator=signed_sim)
         # In simulator mode: skip stale check (historical 'seen' values are large)
         # Only use deduplication check to detect same record sent twice

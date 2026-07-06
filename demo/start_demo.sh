@@ -53,20 +53,22 @@ lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 
 # 6. Start pipeline + dashboard
 echo ""
-echo "[START] Pipeline + Dashboard starting..."
+echo "[START] Pipeline + Dashboard starting (scripted demo scenario active)..."
 echo "        Dashboard: http://localhost:$PORT"
 echo "        Login:     operator / operator123"
 echo "        Analyst:   analyst  / analyst123"
 echo ""
-echo "[DEMO ATTACKS — run in another terminal (export ADSB_HMAC_KEY first):]"
+echo "[SCRIPTED DEMO AIRCRAFT — injected automatically every cycle:]"
+echo "  GHOST01  -> INVALID   (malformed ICAO)"
+echo "  abc123   -> INVALID   (altitude out of physical range)"
+echo "  def456   -> SUSPICIOUS (ghost/anomaly — impossible position jump)"
+echo "  112233   -> SUSPICIOUS (replay — identical packet every cycle)"
+echo "  445566   -> SUSPICIOUS (hmac_fail — deliberately tampered tag)"
+echo ""
+echo "[OPTIONAL — additional attacks from a second terminal:]"
 echo "  export ADSB_HMAC_KEY=$ADSB_HMAC_KEY"
 echo "  export IF_THRESHOLD=0.6"
-echo "  python3.11 -m demo.inject_attack --attack ghost"
-echo "  python3.11 -m demo.inject_attack --attack ghost_valid"
-echo "  python3.11 -m demo.inject_attack --attack replay"
-echo "  python3.11 -m demo.inject_attack --attack tamper"
 echo "  python3.11 -m demo.inject_attack --attack flood"
-echo "  python3.11 -m demo.inject_attack --attack all"
 echo ""
 echo "Press Ctrl+C to stop."
 echo ""
@@ -75,4 +77,5 @@ $PYTHON -m adsb_secure \
     --mode simulator \
     --file notebook/samples/testing/sample.json \
     --interval 3 \
-    --port $PORT
+    --port $PORT \
+    --demo
