@@ -45,9 +45,14 @@ _DASHBOARD_HTML = """
     .nav a:hover { color: #00ff41; }
     .stats { font-size:.8em; color:#aaa; margin:.3rem 0; }
     #map { width:100%; height:400px; background:#111; border:1px solid #1a1a1a; margin:.5rem 0; border-radius:4px; }
-    table { border-collapse: collapse; width: 100%; margin-top: .5rem; }
+    #search { background:#111; color:#00ff41; border:1px solid #333; padding:.4rem .6rem;
+              width:100%; max-width:320px; margin:.5rem 0; font-family:monospace; }
+    #search::placeholder { color:#666; }
+    .table-wrap { max-height: 360px; overflow-y: auto; border: 1px solid #1a1a1a; border-radius: 4px; }
+    table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #1a1a1a; padding: .3rem .6rem; text-align: left; font-size: .8em; }
-    th { background:#111; color:#aaa; }
+    th { background:#111; color:#aaa; position: sticky; top: 0; z-index: 1; }
+    .plane-icon { transform-origin: center; filter: drop-shadow(0 0 2px #000); }
     .valid   { color: #00ff41; }
     .suspicious { color: #ff4444; font-weight: bold; }
     .unverified { color: #ffaa00; }
@@ -109,14 +114,16 @@ _DASHBOARD_HTML = """
   <div id="map"></div>
 
   <!-- Trace table -->
-  <table>
+  <input id="search" type="text" placeholder="Filtra per ICAO o flight&hellip;" oninput="filterTable()">
+  <div class="table-wrap">
+  <table id="traces-table">
     <tr>
       <th>ICAO</th><th>Flight</th><th>Status</th>
       <th>Lat</th><th>Lon</th><th>Alt (ft)</th>
       <th>Speed (kt)</th><th>Track&deg;</th><th>Anomaly</th><th>Reason</th>
     </tr>
     {% for t in traces %}
-    <tr>
+    <tr data-icao="{{ (t.hex or '')|lower }}" data-flight="{{ (t.flight or '')|lower|trim }}">
       <td><a href="/api/aircraft/{{ t.hex }}">{{ t.hex }}</a></td>
       <td>{{ t.flight or '—' }}</td>
       <td class="{{ t.status }}"><span class="badge">{{ t.status.upper() }}</span></td>
@@ -127,11 +134,12 @@ _DASHBOARD_HTML = """
       <td>{{ t.track|int if t.track is not none else '—' }}</td>
       <td>{{ '%.2f'|format(t.anomaly_score) if t.anomaly_score is not none else '—' }}</td>
       <td style="font-size:.75em;color:#888">
-        {{ (t.structural_reasons + ([t.anomaly_reason] if t.anomaly_reason else []))|join(', ') or '—' }}
+        {{ reasons_for(t)|join(', ') or '—' }}
       </td>
     </tr>
     {% endfor %}
   </table>
+  </div>
 
   <script>
     var map = L.map('map', {zoomControl: true}).setView([30, 0], 2);
@@ -143,6 +151,22 @@ _DASHBOARD_HTML = """
     var statusColor = {valid:'#00ff41', suspicious:'#ff4444', unverified:'#ffaa00', invalid:'#555'};
     var markers = {};
 
+    function planeIcon(color, trackDeg) {
+      var rot = (trackDeg == null) ? 0 : trackDeg;
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
+        + 'class="plane-icon" style="transform: rotate(' + rot + 'deg)">'
+        + '<path fill="' + color + '" d="M12 2l3 7h6l-5 4 2 7-6-4-6 4 2-7-5-4h6z"/></svg>';
+      return L.divIcon({html: svg, className: '', iconSize: [22, 22], iconAnchor: [11, 11]});
+    }
+
+    function reasonsFor(t) {
+      var r = (t.structural_reasons || []).slice();
+      if (t.hmac_valid === false) r.push('hmac_invalid');
+      if (t.replay_detected) r.push('replay_detected');
+      if (t.anomaly_reason) r.push(t.anomaly_reason);
+      return r;
+    }
+
     function refreshTraces() {
       fetch('/api/traces')
         .then(r => r.json())
@@ -153,28 +177,36 @@ _DASHBOARD_HTML = """
             seen.add(t.hex);
             var color = statusColor[t.status] || '#888';
             var label = (t.flight || t.hex).trim();
+            var reasons = reasonsFor(t);
             var popup = '<b>' + label + '</b><br/>'
               + 'Status: <span style="color:' + color + '">' + t.status.toUpperCase() + '</span><br/>'
               + 'Alt: ' + (t.altitude ? Math.round(t.altitude) + ' ft' : '—') + '<br/>'
               + 'Speed: ' + (t.speed ? Math.round(t.speed) + ' kt' : '—') + '<br/>'
+              + 'Track: ' + (t.track != null ? Math.round(t.track) + '&deg;' : '—') + '<br/>'
               + (t.anomaly_score != null ? 'Anomaly: ' + t.anomaly_score.toFixed(2) + '<br/>' : '')
-              + (t.anomaly_reason ? '<em>' + t.anomaly_reason + '</em>' : '');
+              + (reasons.length ? '<em>' + reasons.join(', ') + '</em>' : '');
 
             if (markers[t.hex]) {
               markers[t.hex].setLatLng([t.lat, t.lon])
-                .setStyle({color: color, fillColor: color})
+                .setIcon(planeIcon(color, t.track))
                 .setPopupContent(popup);
             } else {
-              markers[t.hex] = L.circleMarker([t.lat, t.lon], {
-                radius: 6, color: color, fillColor: color,
-                fillOpacity: 0.85, weight: 1.5
-              }).bindPopup(popup).addTo(map);
+              markers[t.hex] = L.marker([t.lat, t.lon], {icon: planeIcon(color, t.track)})
+                .bindPopup(popup).addTo(map);
             }
           });
           Object.keys(markers).forEach(hex => {
             if (!seen.has(hex)) { map.removeLayer(markers[hex]); delete markers[hex]; }
           });
         }).catch(() => {});
+    }
+
+    function filterTable() {
+      var q = document.getElementById('search').value.trim().toLowerCase();
+      document.querySelectorAll('#traces-table tr[data-icao]').forEach(function(row) {
+        var match = !q || row.dataset.icao.includes(q) || row.dataset.flight.includes(q);
+        row.style.display = match ? '' : 'none';
+      });
     }
 
     refreshTraces();
@@ -412,6 +444,23 @@ _ANALYST_HTML = """
 """
 
 
+def _full_reasons(t) -> list:
+    """
+    Every reason a trace could be classified as it is — structural checks,
+    HMAC failure, replay detection, and ML anomaly. Used by both the trace
+    table and the alert panel so a SUSPICIOUS status is never shown with an
+    empty explanation.
+    """
+    reasons = list(t.structural_reasons)
+    if t.hmac_valid is False:
+        reasons.append("hmac_invalid")
+    if t.replay_detected:
+        reasons.append("replay_detected")
+    if t.anomaly_reason:
+        reasons.append(t.anomaly_reason)
+    return reasons
+
+
 def _build_alerts(traces) -> list:
     """Derive alert list from traces filtered by ALERT_MIN_SEVERITY."""
     min_sev = _SEVERITY_ORDER.get(_ALERT_MIN_SEVERITY, 1)
@@ -419,9 +468,7 @@ def _build_alerts(traces) -> list:
     for t in traces:
         sev = _TRACE_SEVERITY.get(t.status.value, "low")
         if _SEVERITY_ORDER.get(sev, 0) >= min_sev:
-            reasons = list(t.structural_reasons)
-            if t.anomaly_reason:
-                reasons.append(t.anomaly_reason)
+            reasons = _full_reasons(t)
             alerts.append({
                 "icao": t.hex,
                 "flight": t.flight.strip() if t.flight else None,
@@ -509,6 +556,7 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
             alerts=alerts,
             username=session.get("username", "?"),
             role=session.get("role", "operator"),
+            reasons_for=_full_reasons,
         )
 
     @app.get("/api/traces")
