@@ -218,6 +218,49 @@ _DASHBOARD_HTML = """
       return r;
     }
 
+    // Builds the popup as real DOM nodes (createElement + textContent) rather
+    // than an HTML string handed to Leaflet — user-influenced fields (flight,
+    // anomaly/structural reasons) never pass through an HTML parser at all,
+    // so there is no escaping to get right or forget.
+    function buildPopup(t, color, reasons) {
+      var root = document.createElement('div');
+
+      var title = document.createElement('b');
+      title.textContent = (t.flight || t.hex).trim();
+      root.appendChild(title);
+      root.appendChild(document.createElement('br'));
+
+      function line(labelText, valueText, valueColor) {
+        root.appendChild(document.createTextNode(labelText + ': '));
+        var span = document.createElement('span');
+        if (valueColor) span.style.color = valueColor;
+        span.textContent = valueText;
+        root.appendChild(span);
+        root.appendChild(document.createElement('br'));
+      }
+
+      line('Status', t.status.toUpperCase(), color);
+      line('Alt', t.altitude ? Math.round(t.altitude) + ' ft' : '—');
+      line('Speed', t.speed ? Math.round(t.speed) + ' kt' : '—');
+      line('Track', t.track != null ? Math.round(t.track) + '°' : '—');
+      if (t.anomaly_score != null) line('Anomaly', t.anomaly_score.toFixed(2));
+
+      if (reasons.length) {
+        var em = document.createElement('em');
+        em.textContent = reasons.join(', ');
+        root.appendChild(em);
+        root.appendChild(document.createElement('br'));
+      }
+
+      var link = document.createElement('a');
+      link.href = '#';
+      link.textContent = 'Dettagli completi →';
+      link.onclick = function(e) { e.preventDefault(); showDetail(t.hex); };
+      root.appendChild(link);
+
+      return root;
+    }
+
     function refreshTraces() {
       fetch('/api/traces')
         .then(r => r.json())
@@ -227,16 +270,8 @@ _DASHBOARD_HTML = """
             if (t.lat == null || t.lon == null) return;
             seen.add(t.hex);
             var color = statusColor[t.status] || '#888';
-            var label = (t.flight || t.hex).trim();
             var reasons = reasonsFor(t);
-            var popup = '<b>' + escapeHtml(label) + '</b><br/>'
-              + 'Status: <span style="color:' + color + '">' + escapeHtml(t.status.toUpperCase()) + '</span><br/>'
-              + 'Alt: ' + (t.altitude ? Math.round(t.altitude) + ' ft' : '—') + '<br/>'
-              + 'Speed: ' + (t.speed ? Math.round(t.speed) + ' kt' : '—') + '<br/>'
-              + 'Track: ' + (t.track != null ? Math.round(t.track) + '&deg;' : '—') + '<br/>'
-              + (t.anomaly_score != null ? 'Anomaly: ' + t.anomaly_score.toFixed(2) + '<br/>' : '')
-              + (reasons.length ? '<em>' + escapeHtml(reasons.join(', ')) + '</em><br/>' : '')
-              + '<a href="#" onclick="showDetail(&quot;' + escapeHtml(t.hex) + '&quot;); return false;">Dettagli completi &rarr;</a>';
+            var popup = buildPopup(t, color, reasons);
 
             if (markers[t.hex]) {
               markers[t.hex].setLatLng([t.lat, t.lon])
