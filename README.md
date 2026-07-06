@@ -77,7 +77,7 @@ Ogni pacchetto attraversa la catena completa prima di essere mostrato o archivia
 - **Feature extraction**: delta posizione/velocità/quota, haversine distance, speed discrepancy
 - **Isolation Forest**: anomaly detection non supervisionato (scikit-learn), score continuo, wired end-to-end nella pipeline live
 - **Training su dati reali**: ~8.500 record da campioni ADSB Exchange + augmentazione sintetica
-- **Dashboard Leaflet.js**: marker colorati per status, alert panel con timestamp e motivazione, pagina eventi per analisti con filtri
+- **Dashboard Leaflet.js**: marker aereo ruotati per direzione (track), rotte di volo (trail) per traccia, barra di ricerca ICAO/flight, tabella tracce scrollabile, alert panel con timestamp e motivazione completa (strutturale/HMAC/replay/anomaly), pagina eventi per analisti con filtri
 - **Export audit**: report CSV/PDF degli eventi di sicurezza, solo per `analyst`
 
 ---

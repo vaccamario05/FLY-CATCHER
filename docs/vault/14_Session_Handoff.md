@@ -1,5 +1,81 @@
 # Session Handoff
 
+## Ultima sessione: 2026-07-06 — Sessione 8: chiusura gap requisiti + security fix + feed reale + UX dashboard ✅
+
+### Contesto
+Sessione guidata da requisiti formali (RF/RNF/security stories/misuse case/threat model) letti a raffica dall'utente,
+riscontrati uno a uno contro il codice esistente. La maggior parte erano già soddisfatti; individuati e chiusi gap reali.
+
+### Gap chiusi (implementazione)
+
+1. **ML anomaly detection non era wired in pipeline** (PB3/PB8) — `AnomalyDetector.annotate()` esisteva e testato ma mai
+   chiamato da `adsb_secure/__main__.py`. Ora invocato prima di `classify()`, logga `ANOMALY_DETECTED`.
+2. **`LOGIN_SUCCESS` mai loggato** (PB10/MC6) — solo i fallimenti finivano nel forensic log. Aggiunto.
+3. **Pipeline senza self-healing** (PB15) — un'eccezione non gestita uccideva il thread silenziosamente. Ora
+   `_pipeline_supervisor()` cattura e riavvia. `/health` riflette liveness reale (heartbeat), non più statico.
+4. **PB13 (latenza/perf) mai verificato** — aggiunto `tests/test_perf.py`: latenza media/p95 pipeline, packet loss
+   sotto rate limiting.
+5. **RNF3 FN rate non testato** (solo FP testato) — aggiunto `test_false_negative_rate_on_ghost_data`.
+6. **RBAC senza gestione soglie runtime** — nessun modo di cambiare rate limit/replay window/anomaly threshold/alert
+   severity senza restart. Aggiunto `GET/POST /api/config/thresholds`, solo ruolo `analyst`, logga `CONFIG_CHANGED`.
+7. **Bug scoperto durante il fix sopra**: `security/classifier.py` confrontava `anomaly_score` con soglia hardcoded
+   0.7, ignorando `IF_THRESHOLD` configurabile di `ml/anomaly_detector.py` — `annotate()` flaggava SUSPICIOUS a una
+   soglia diversa da quella poi usata (e silenziosamente sovrascritta) da `classify()`. Fixato per leggere la stessa
+   soglia dal modulo.
+8. **CWE-259 — password hardcoded** in `web/auth.py` (`operator123` ecc. come default statici nel sorgente pubblico).
+   Rimossi: se env var assente, genera password random via `secrets.token_urlsafe` e la logga una tantum. Test/demo
+   spostati su env var esplicite (`tests/conftest.py`, `demo/start_demo.sh`).
+9. **CWE-79 — XSS reale** in `/analyst/events`: la colonna dettagli usava un escape homemade (`.replace()`) solo
+   sull'attributo `title`, il contenuto visibile della cella era iniettato via `innerHTML` **senza escape**. Vettore
+   reale: un ICAO malformato (fallisce regex validator) finisce comunque nel campo `icao` dell'evento forensic
+   `PACKET_INVALID` prima di essere scartato dalla pipeline. Fixato con un `escapeHtml()` unico applicato a tutti i
+   campi (event_type, icao, details, id).
+10. **Bug latente in `acquisition.py`**: `_validate_url()` solleva `ValueError` su scheme non-http/https, ma
+    `_fetch_from_http` non lo catturava — violava il contratto "never raises" della docstring. Fixato.
+11. **Feed ADS-B reale (ADS-B Exchange / airplanes.live)** — `DataIngestion` ora accetta `headers` (per API key) e
+    legge sia `data["aircraft"]` (dump1090) che `data["ac"]` (readsb-based, stesso schema campi). Config via
+    `DUMP1090_URL` + `ADSB_HTTP_HEADERS` (JSON). Testato live con airplanes.live (serve User-Agent realistico,
+    Cloudflare blocca lo user-agent di default di urllib).
+12. **Bug simulatore: falso "tutto SUSPICIOUS"** — `JSONSimulator(loop=True)` ri-leggeva lo stesso file statico
+    identico ogni ciclo → `ReplayDetector` (correttamente) flaggava ogni traccia come replay dal 2° ciclo in poi.
+    Fixato: il simulatore ora varia leggermente `seen` a ogni reload, come farebbe un feed vivo.
+13. **Dashboard UX** (feedback utente diretto): colonna "Reason" mostrava solo strutturale+anomaly, non
+    hmac/replay → spesso "—" pur essendo SUSPICIOUS. Fixato con `_full_reasons()` condivisa da tabella+alert+popup.
+    Aggiunta barra di ricerca ICAO/flight, tabella con scroll+sticky header (era lista interminabile), marker
+    aereo ruotati per track (invece di pallini statici), **rotte di volo (trail)** disegnate client-side accumulando
+    posizioni per ICAO ad ogni refresh.
+
+### Verificato coerente (nessuna azione)
+
+Validazione strutturale, HMAC PoC scope, replay detection, rate limiting, RBAC segregazione route, fail-safe
+classification, logging append-only+hash chain, no-transmit, no-alterazione-dati-originali, export audit,
+NIST 800-53 mapping (discusso, non scritto in doc), disclaimer certificazione in README — tutti già a posto.
+
+### File toccati (principali)
+- `adsb_secure/__main__.py`, `adsb_secure/acquisition.py`
+- `security/classifier.py`, `security/forensic_logger.py`
+- `web/app.py` (grosso: config endpoint, error handler, XSS fix, UX dashboard, reasons)
+- `web/auth.py` (no hardcoded passwords)
+- `ml/anomaly_detector.py` (`is_trained` property)
+- `simulator/replay.py` (fix loop replay)
+- `tests/test_perf.py`, `tests/test_acquisition.py` (nuovi)
+- `tests/test_anomaly.py`, `tests/conftest.py`
+- `demo/start_demo.sh`, `README.md`
+
+### Stato finale
+- **119/119 test verdi**
+- Commit multipli, tutti pushati su `main`
+
+### Note per prossima sessione
+- Refuso doc (non codice) segnalato all'utente: tabella STRIDE 4.6 usa "A6 log forensi", dovrebbe essere "A8" (A6 è
+  il modulo anomaly detection in 4.2) — da correggere nel testo della relazione, non nel codice.
+- Utente ha una API key RapidAPI per ADS-B Exchange ma piano free non più disponibile — passato ad airplanes.live
+  (nessuna key richiesta). Se serve tornare a ADS-B Exchange, verificare piano a pagamento attivo.
+- Trail di volo sono client-side/per-sessione-browser (si azzerano al refresh pagina) — se serve persistenza
+  storica delle rotte, andrebbe aggiunto un endpoint `/api/aircraft/<icao>/history` che legge da `trace_store`.
+
+---
+
 ## Ultima sessione: 2026-07-06 — Sessione 7: Agile Scrum backlog — US2/US3/US4/UC2-EX1/RBAC ✅
 
 ### Contesto
