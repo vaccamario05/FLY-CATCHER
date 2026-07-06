@@ -14,6 +14,7 @@ Session timeout: 30 minutes inactivity.
 import functools
 import logging
 import os
+import secrets
 import time
 from typing import Optional
 
@@ -28,24 +29,39 @@ auth_bp = Blueprint("auth", __name__)
 
 # ---------------------------------------------------------------------------
 # In-memory user store (Sprint 2 — no DB needed for prototype)
-# Bootstrap users from env or defaults. Change in production.
+# Bootstrap users from env. No hardcoded fallback (CWE-259): if a password
+# env var is unset, a random one-time password is generated and logged once
+# at startup — never persisted, never a static known value.
 # ---------------------------------------------------------------------------
+
+def _bootstrap_password(env_var: str, role: str) -> str:
+    password = os.environ.get(env_var)
+    if password:
+        return password
+    password = secrets.token_urlsafe(16)
+    logger.warning(
+        "%s not set — generated one-time password for role=%s: %s",
+        env_var, role, password,
+    )
+    return password
+
+
 _USERS: dict[str, dict] = {
     "operator": {
         "password_hash": generate_password_hash(
-            os.environ.get("OPERATOR_PASSWORD", "operator123")
+            _bootstrap_password("OPERATOR_PASSWORD", "operator")
         ),
         "role": "operator",
     },
     "supervisor": {
         "password_hash": generate_password_hash(
-            os.environ.get("SUPERVISOR_PASSWORD", "supervisor123")
+            _bootstrap_password("SUPERVISOR_PASSWORD", "supervisor")
         ),
         "role": "supervisor",
     },
     "analyst": {
         "password_hash": generate_password_hash(
-            os.environ.get("ANALYST_PASSWORD", "analyst123")
+            _bootstrap_password("ANALYST_PASSWORD", "analyst")
         ),
         "role": "analyst",
     },

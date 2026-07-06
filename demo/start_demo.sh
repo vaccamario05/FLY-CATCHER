@@ -34,6 +34,11 @@ fi
 # IF threshold: lower for demo to ensure ghost detection
 export IF_THRESHOLD=0.6
 
+# Dashboard demo credentials — explicit, not hardcoded in source (CWE-259)
+export OPERATOR_PASSWORD=${OPERATOR_PASSWORD:-operator123}
+export ANALYST_PASSWORD=${ANALYST_PASSWORD:-analyst123}
+export SUPERVISOR_PASSWORD=${SUPERVISOR_PASSWORD:-supervisor123}
+
 # 4. Train IF model if not present
 if [ ! -f "models/isolation_forest.pkl" ]; then
     echo "[TRAIN] Training Isolation Forest on real samples..."
