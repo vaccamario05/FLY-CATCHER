@@ -203,11 +203,12 @@ _DASHBOARD_HTML = """
     var MAX_TRAIL_POINTS = 50;
 
     function planeIcon(color, trackDeg) {
-      var rot = (trackDeg == null) ? 0 : trackDeg;
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" '
-        + 'class="plane-icon" style="transform: rotate(' + rot + 'deg)">'
-        + '<path fill="' + color + '" d="M12 2l3 7h6l-5 4 2 7-6-4-6 4 2-7-5-4h6z"/></svg>';
-      return L.divIcon({html: svg, className: '', iconSize: [22, 22], iconAnchor: [11, 11]});
+      // ✈ points to the upper-right (~45°) in most fonts, so offset the
+      // rotation to align 0° track (north) with the glyph's rest orientation.
+      var rot = (trackDeg == null) ? 0 : trackDeg - 45;
+      var html = '<div class="plane-icon" style="transform: rotate(' + rot + 'deg); '
+        + 'color: ' + color + '; font-size: 20px; line-height: 1;">&#9992;</div>';
+      return L.divIcon({html: html, className: '', iconSize: [22, 22], iconAnchor: [11, 11]});
     }
 
     function reasonsFor(t) {
