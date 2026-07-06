@@ -53,6 +53,23 @@ _DASHBOARD_HTML = """
     th, td { border: 1px solid #1a1a1a; padding: .3rem .6rem; text-align: left; font-size: .8em; }
     th { background:#111; color:#aaa; position: sticky; top: 0; z-index: 1; }
     .plane-icon { transform-origin: center; filter: drop-shadow(0 0 2px #000); }
+    /* Aircraft detail modal */
+    .detail-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
+                       z-index:1000; align-items:center; justify-content:center; }
+    .detail-overlay.open { display:flex; }
+    .detail-modal { background:#0a0a0a; border:1px solid #00ff41; border-radius:6px;
+                    width:min(560px, 92vw); max-height:80vh; overflow-y:auto; padding:1rem 1.2rem; }
+    .detail-modal-header { display:flex; justify-content:space-between; align-items:center;
+                            border-bottom:1px solid #1a1a1a; padding-bottom:.5rem; margin-bottom:.6rem; }
+    .detail-modal-header span:first-child { font-weight:bold; font-size:1.05em; }
+    .detail-close { cursor:pointer; font-size:1.4em; color:#888; line-height:1; }
+    .detail-close:hover { color:#ff4444; }
+    .detail-grid { display:grid; grid-template-columns: auto 1fr; gap:.3rem 1rem; font-size:.85em; }
+    .detail-grid dt { color:#888; }
+    .detail-grid dd { margin:0; word-break:break-word; }
+    .detail-section-title { color:#aaa; font-size:.85em; margin:.8rem 0 .3rem; border-top:1px solid #1a1a1a; padding-top:.6rem; }
+    .detail-history { width:100%; border-collapse:collapse; font-size:.75em; margin-top:.3rem; }
+    .detail-history th, .detail-history td { border:1px solid #1a1a1a; padding:.2rem .4rem; text-align:left; }
     .valid   { color: #00ff41; }
     .suspicious { color: #ff4444; font-weight: bold; }
     .unverified { color: #ffaa00; }
@@ -119,7 +136,7 @@ _DASHBOARD_HTML = """
     {% for a in alerts %}
     <div class="alert-row" data-severity="{{ a.severity }}" data-hmac="{{ 'yes' if 'hmac_invalid' in a.reasons else 'no' }}">
       <span class="sev-{{ a.severity }}">{{ a.severity.upper() }}</span>
-      <a href="/api/aircraft/{{ a.icao }}">{{ a.icao }}</a>
+      <a href="#" onclick="showDetail('{{ a.icao }}'); return false;">{{ a.icao }}</a>
       {% if a.flight %}<em>({{ a.flight }})</em>{% endif %}
       &mdash; {{ a.reasons|join(' &middot; ') or 'Anomaly detected' }}
       {% if a.anomaly_score is not none %}<small style="color:#888">[score: {{ '%.2f'|format(a.anomaly_score) }}]</small>{% endif %}
@@ -144,7 +161,7 @@ _DASHBOARD_HTML = """
     </tr>
     {% for t in traces %}
     <tr data-icao="{{ (t.hex or '')|lower }}" data-flight="{{ (t.flight or '')|lower|trim }}">
-      <td><a href="/api/aircraft/{{ t.hex }}">{{ t.hex }}</a></td>
+      <td><a href="#" onclick="showDetail('{{ t.hex }}'); return false;">{{ t.hex }}</a></td>
       <td>{{ t.flight or '—' }}</td>
       <td class="{{ t.status }}"><span class="badge">{{ t.status.upper() }}</span></td>
       <td>{{ '%.4f'|format(t.lat) if t.lat is not none else '—' }}</td>
@@ -159,6 +176,17 @@ _DASHBOARD_HTML = """
     </tr>
     {% endfor %}
   </table>
+  </div>
+
+  <!-- Aircraft detail modal -->
+  <div id="detail-overlay" class="detail-overlay" onclick="if(event.target===this) closeDetail()">
+    <div class="detail-modal">
+      <div class="detail-modal-header">
+        <span id="detail-title">Aircraft</span>
+        <span class="detail-close" onclick="closeDetail()">&times;</span>
+      </div>
+      <div id="detail-body">Loading&hellip;</div>
+    </div>
   </div>
 
   <script>
@@ -201,13 +229,14 @@ _DASHBOARD_HTML = """
             var color = statusColor[t.status] || '#888';
             var label = (t.flight || t.hex).trim();
             var reasons = reasonsFor(t);
-            var popup = '<b>' + label + '</b><br/>'
-              + 'Status: <span style="color:' + color + '">' + t.status.toUpperCase() + '</span><br/>'
+            var popup = '<b>' + escapeHtml(label) + '</b><br/>'
+              + 'Status: <span style="color:' + color + '">' + escapeHtml(t.status.toUpperCase()) + '</span><br/>'
               + 'Alt: ' + (t.altitude ? Math.round(t.altitude) + ' ft' : '—') + '<br/>'
               + 'Speed: ' + (t.speed ? Math.round(t.speed) + ' kt' : '—') + '<br/>'
               + 'Track: ' + (t.track != null ? Math.round(t.track) + '&deg;' : '—') + '<br/>'
               + (t.anomaly_score != null ? 'Anomaly: ' + t.anomaly_score.toFixed(2) + '<br/>' : '')
-              + (reasons.length ? '<em>' + reasons.join(', ') + '</em>' : '');
+              + (reasons.length ? '<em>' + escapeHtml(reasons.join(', ')) + '</em><br/>' : '')
+              + '<a href="#" onclick="showDetail(\'' + escapeHtml(t.hex) + '\'); return false;">Dettagli completi &rarr;</a>';
 
             if (markers[t.hex]) {
               markers[t.hex].setLatLng([t.lat, t.lon])
@@ -275,6 +304,69 @@ _DASHBOARD_HTML = """
         var match = !q || row.dataset.icao.includes(q) || row.dataset.flight.includes(q);
         row.style.display = match ? '' : 'none';
       });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    var DETAIL_FIELDS = [
+      ['hex', 'ICAO'], ['flight', 'Flight'], ['squawk', 'Squawk'], ['status', 'Status'],
+      ['lat', 'Lat'], ['lon', 'Lon'], ['altitude', 'Alt (ft)'], ['speed', 'Speed (kt)'],
+      ['track', 'Track (deg)'], ['vert_rate', 'Vert. rate (fpm)'], ['rssi', 'RSSI (dBFS)'],
+      ['messages', 'Messages'], ['seen', 'Seen (s)'], ['seen_pos', 'Seen pos (s)'],
+      ['structural_valid', 'Structural valid'], ['hmac_valid', 'HMAC valid'],
+      ['replay_detected', 'Replay detected'], ['anomaly_score', 'Anomaly score'],
+      ['anomaly_reason', 'Anomaly reason'], ['received_at', 'Received at'],
+    ];
+
+    function showDetail(icao) {
+      var overlay = document.getElementById('detail-overlay');
+      var body = document.getElementById('detail-body');
+      document.getElementById('detail-title').textContent = icao;
+      body.innerHTML = 'Loading&hellip;';
+      overlay.classList.add('open');
+
+      fetch('/api/aircraft/' + encodeURIComponent(icao))
+        .then(r => r.json())
+        .then(function(data) {
+          if (data.error) { body.textContent = 'No data for ' + icao; return; }
+          var latest = data.latest;
+          var rows = DETAIL_FIELDS.map(function(f) {
+            var key = f[0], label = f[1];
+            var val = latest[key];
+            if (val === null || val === undefined || val === '') val = '&mdash;';
+            else if (typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(4);
+            else val = escapeHtml(val);
+            return '<dt>' + escapeHtml(label) + '</dt><dd>' + val + '</dd>';
+          }).join('');
+
+          var reasons = (latest.structural_reasons || []).map(escapeHtml).join(', ') || '&mdash;';
+
+          var historyRows = data.history.slice().reverse().map(function(h) {
+            var ts = new Date(h.received_at * 1000).toLocaleTimeString();
+            return '<tr><td>' + escapeHtml(ts) + '</td><td>' + escapeHtml(h.status) + '</td>'
+              + '<td>' + (h.lat != null ? h.lat.toFixed(4) : '&mdash;') + '</td>'
+              + '<td>' + (h.lon != null ? h.lon.toFixed(4) : '&mdash;') + '</td>'
+              + '<td>' + (h.altitude != null ? Math.round(h.altitude) : '&mdash;') + '</td>'
+              + '<td>' + (h.speed != null ? Math.round(h.speed) : '&mdash;') + '</td></tr>';
+          }).join('');
+
+          body.innerHTML =
+            '<dl class="detail-grid">' + rows + '</dl>'
+            + '<div class="detail-section-title">Structural reasons</div>'
+            + '<div style="font-size:.85em;color:#ccc">' + reasons + '</div>'
+            + '<div class="detail-section-title">History (' + data.count + ' records, newest first)</div>'
+            + '<table class="detail-history"><tr><th>Time</th><th>Status</th><th>Lat</th><th>Lon</th><th>Alt</th><th>Speed</th></tr>'
+            + historyRows + '</table>';
+        })
+        .catch(function() { body.textContent = 'Error loading data for ' + icao; });
+    }
+
+    function closeDetail() {
+      document.getElementById('detail-overlay').classList.remove('open');
     }
 
     refreshTraces();
