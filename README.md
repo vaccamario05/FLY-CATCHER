@@ -124,10 +124,25 @@ Se una password non viene configurata, il sistema ne genera una casuale all'avvi
 | `supervisor` | Dashboard + tracce (privilegio intermedio) |
 | `analyst` | Dashboard + log forensi + export CSV/PDF + configurazione soglie |
 
-### Test su traffico reale (ADS-B Exchange)
+### Test su traffico reale
 
-Invece del simulatore, la pipeline può leggere da un feed HTTP esterno pubblico. ADS-B Exchange (readsb-based) usa lo stesso schema JSON per-record di dump1090 (`hex`, `alt_baro`, `gs`, ...), quindi è già compatibile — serve solo l'URL e, se richiesta, una API key:
+Invece del simulatore, la pipeline può leggere da un feed HTTP esterno pubblico. Tre opzioni supportate nativamente da `acquisition.py` (auto-rilevate dallo schema JSON):
 
+**OpenSky Network** (consigliata — nessuna key, servizio pubblico stabile da anni):
+```bash
+export DUMP1090_URL="https://opensky-network.org/api/states/all?lamin=40.3&lomin=13.7&lamax=41.3&lomax=14.9"
+python3.11 -m adsb_secure --mode live
+```
+`lamin/lomin/lamax/lomax` = bounding box lat/lon min-max (esempio: area Napoli). Rate-limited per uso anonimo ma sufficiente per demo.
+
+**airplanes.live** (readsb-based, nessuna key, ma servizio meno stabile — verificato soggetto a interruzioni):
+```bash
+export DUMP1090_URL="https://api.airplanes.live/v2/point/<lat>/<lon>/<raggio_km>"
+export ADSB_HTTP_HEADERS='{"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}'
+python3.11 -m adsb_secure --mode live
+```
+
+**ADS-B Exchange** (RapidAPI, richiede sottoscrizione a pagamento — piano gratuito non più disponibile):
 ```bash
 export DUMP1090_URL="https://adsbexchange-com1.p.rapidapi.com/v2/lat/<lat>/lon/<lon>/dist/<km>/"
 export ADSB_HTTP_HEADERS='{"X-RapidAPI-Key": "<la-tua-chiave>", "X-RapidAPI-Host": "adsbexchange-com1.p.rapidapi.com"}'
@@ -153,7 +168,7 @@ Scenari disponibili: `ghost` · `ghost_valid` · `replay` · `tamper` · `flood`
 ## Test e qualità
 
 ```bash
-# Suite completa (119 test)
+# Suite completa (128 test)
 python3.11 -m pytest tests/ -v
 
 # Static analysis
@@ -174,7 +189,7 @@ ml/                feature_extractor, anomaly_detector, train
 web/               Flask app (dashboard, auth RBAC, config soglie, export audit)
 simulator/         JSONSimulator, HMACPreprocessor
 demo/              inject_attack.py, start_demo.sh, demo_script.md
-tests/             119 test (12 moduli, incl. perf, acquisition multi-provider)
+tests/             128 test (14 moduli, incl. perf, acquisition multi-provider, review workflow)
 docs/vault/        Vault Obsidian — memoria persistente del progetto
 docs/appendice_tecnica.md  appendice tecnica per documentazione accademica
 device-rpi/        Fly-catcher originale (display legacy su Raspberry Pi)

@@ -63,3 +63,47 @@ def test_disallowed_scheme_rejected():
     ingestion = DataIngestion(url="file:///etc/passwd")
     records = ingestion.fetch()
     assert records == []
+
+
+def test_fetch_opensky_states_converted():
+    """OpenSky uses positional 'states' arrays in metric units — must convert
+    to the dump1090-style dict schema (feet/knots/fpm) normalizer expects."""
+    state = [
+        "44083b", "EJU82AQ ", "Austria", 1783354419, 1783354423,
+        14.2521, 40.9897, 3000.0, False, 100.0, 59.0, -5.0,
+        None, 3100.0, "1000", False, 0,
+    ]
+    with patch("adsb_secure.acquisition.urlopen", return_value=_fake_response({"time": 123, "states": [state]})):
+        ingestion = DataIngestion(url="https://opensky-network.org/api/states/all?lamin=40&lomin=13&lamax=41&lomax=15")
+        records = ingestion.fetch()
+
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["hex"] == "44083b"
+    assert rec["flight"] == "EJU82AQ"
+    assert rec["lat"] == 40.9897
+    assert rec["lon"] == 14.2521
+    assert rec["squawk"] == "1000"
+    # unit conversions: 3000m -> ~9843ft, 100 m/s -> ~194kt
+    assert abs(rec["alt_baro"] - 9842.5) < 1.0
+    assert abs(rec["gs"] - 194.384) < 0.5
+    assert rec["baro_rate"] < 0  # descending
+
+
+def test_fetch_opensky_skips_null_states():
+    with patch("adsb_secure.acquisition.urlopen", return_value=_fake_response({"time": 123, "states": [None, None]})):
+        ingestion = DataIngestion(url="https://opensky-network.org/api/states/all?lamin=40&lomin=13&lamax=41&lomax=15")
+        records = ingestion.fetch()
+    assert records == []
+
+
+def test_fetch_opensky_handles_missing_optional_fields():
+    """callsign/altitude/velocity/vertical_rate/squawk can legitimately be null."""
+    state = ["44083b", None, "Austria", None, None, 14.25, 40.98, None, False, None, None, None, None, None, None, False, 0]
+    with patch("adsb_secure.acquisition.urlopen", return_value=_fake_response({"time": 123, "states": [state]})):
+        ingestion = DataIngestion(url="https://opensky-network.org/api/states/all?lamin=40&lomin=13&lamax=41&lomax=15")
+        records = ingestion.fetch()
+    assert len(records) == 1
+    assert records[0]["flight"] is None
+    assert records[0]["alt_baro"] is None
+    assert records[0]["seen"] is None
