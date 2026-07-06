@@ -119,3 +119,53 @@ def test_empty_log_chain_ok():
     finally:
         if os.path.exists(path):
             os.unlink(path)
+
+
+def test_seq_increments_sequentially():
+    flog, path = _make_logger()
+    try:
+        e1 = flog.log(SecurityEvent(EventType.PACKET_ACCEPTED, Severity.LOW))
+        e2 = flog.log(SecurityEvent(EventType.HMAC_FAIL, Severity.HIGH))
+        e3 = flog.log(SecurityEvent(EventType.REPLAY_DETECTED, Severity.HIGH))
+        assert (e1.seq, e2.seq, e3.seq) == (1, 2, 3)
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+def test_seq_persists_across_logger_instances():
+    """A new ForensicLogger opening an existing file continues the sequence."""
+    tmp = tempfile.mktemp(suffix=".jsonl")
+    try:
+        flog1 = ForensicLogger(tmp)
+        flog1.log(SecurityEvent(EventType.PACKET_ACCEPTED, Severity.LOW))
+        flog1.log(SecurityEvent(EventType.PACKET_ACCEPTED, Severity.LOW))
+
+        flog2 = ForensicLogger(tmp)
+        e3 = flog2.log(SecurityEvent(EventType.PACKET_ACCEPTED, Severity.LOW))
+        assert e3.seq == 3
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def test_seq_gap_detected_as_broken_chain():
+    """A missing record (sequence gap) must be detected even if per-record hashes are locally valid."""
+    flog, path = _make_logger()
+    try:
+        flog.log(SecurityEvent(EventType.PACKET_ACCEPTED, Severity.LOW))
+        flog.log(SecurityEvent(EventType.HMAC_FAIL, Severity.HIGH))
+        flog.log(SecurityEvent(EventType.REPLAY_DETECTED, Severity.HIGH))
+
+        with open(path) as f:
+            lines = [l for l in f if l.strip()]
+        # Delete the middle record entirely (not modify — a clean excision)
+        del lines[1]
+        with open(path, "w") as f:
+            f.writelines(lines)
+
+        ok, broken_at = flog.verify_chain()
+        assert ok is False
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)

@@ -47,6 +47,7 @@ class EventType(str, Enum):
     AUDIT_EXPORT = "audit_export"
     CONFIG_CHANGED = "config_changed"
     STATUS_CHANGED = "status_changed"
+    EVENT_REVIEWED = "event_reviewed"
 
 
 @dataclass
@@ -58,12 +59,14 @@ class SecurityEvent:
     # filled by ForensicLogger
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
+    seq: int = 0
     prev_hash: str = ""
     hash: str = ""
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "seq": self.seq,
             "timestamp": self.timestamp,
             "event_type": self.event_type,
             "severity": self.severity,
@@ -94,11 +97,11 @@ class ForensicLogger:
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._last_hash = self._read_last_hash()
+        self._last_hash, self._last_seq = self._read_last_record()
 
-    def _read_last_hash(self) -> str:
+    def _read_last_record(self) -> tuple[str, int]:
         if not self.log_path.exists():
-            return _GENESIS_HASH
+            return _GENESIS_HASH, 0
         try:
             last_line = ""
             with open(self.log_path, "r", encoding="utf-8") as f:
@@ -107,21 +110,23 @@ class ForensicLogger:
                     if line:
                         last_line = line
             if not last_line:
-                return _GENESIS_HASH
+                return _GENESIS_HASH, 0
             record = json.loads(last_line)
-            return record.get("hash", _GENESIS_HASH)
+            return record.get("hash", _GENESIS_HASH), record.get("seq", 0)
         except Exception as e:
-            logger.error("Cannot read last hash from log: %s", e)
-            return _GENESIS_HASH
+            logger.error("Cannot read last record from log: %s", e)
+            return _GENESIS_HASH, 0
 
     def log(self, event: SecurityEvent) -> SecurityEvent:
-        """Append event to log. Sets prev_hash and hash. Thread-safe."""
+        """Append event to log. Sets seq, prev_hash and hash. Thread-safe."""
         with self._lock:
+            event.seq = self._last_seq + 1
             event.prev_hash = self._last_hash
 
             # Compute hash over canonical record content (excluding hash field itself)
             content = json.dumps({
                 "id": event.id,
+                "seq": event.seq,
                 "timestamp": event.timestamp,
                 "event_type": event.event_type,
                 "severity": event.severity,
@@ -136,7 +141,8 @@ class ForensicLogger:
                 f.write(line + "\n")
 
             self._last_hash = event.hash
-            logger.debug("Logged %s severity=%s icao=%s", event.event_type, event.severity, event.icao)
+            self._last_seq = event.seq
+            logger.debug("Logged #%d %s severity=%s icao=%s", event.seq, event.event_type, event.severity, event.icao)
 
         return event
 
@@ -150,6 +156,7 @@ class ForensicLogger:
             return True, None
 
         prev_hash = _GENESIS_HASH
+        prev_seq = 0
         try:
             with open(self.log_path, "r", encoding="utf-8") as f:
                 for line_num, raw in enumerate(f, start=1):
@@ -161,6 +168,7 @@ class ForensicLogger:
                     # Recompute expected hash
                     content = json.dumps({
                         "id": record["id"],
+                        "seq": record.get("seq", 0),
                         "timestamp": record["timestamp"],
                         "event_type": record["event_type"],
                         "severity": record["severity"],
@@ -176,8 +184,15 @@ class ForensicLogger:
                     if record.get("hash") != expected:
                         logger.error("Chain broken at line %d: hash mismatch", line_num)
                         return False, line_num
+                    if record.get("seq", 0) != prev_seq + 1:
+                        logger.error(
+                            "Chain broken at line %d: sequence gap (expected %d, got %s)",
+                            line_num, prev_seq + 1, record.get("seq"),
+                        )
+                        return False, line_num
 
                     prev_hash = record["hash"]
+                    prev_seq = record.get("seq", prev_seq + 1)
         except Exception as e:
             logger.error("Chain verification error: %s", e)
             return False, None

@@ -52,18 +52,21 @@ _USERS: dict[str, dict] = {
             _bootstrap_password("OPERATOR_PASSWORD", "operator")
         ),
         "role": "operator",
+        "last_login": None,
     },
     "supervisor": {
         "password_hash": generate_password_hash(
             _bootstrap_password("SUPERVISOR_PASSWORD", "supervisor")
         ),
         "role": "supervisor",
+        "last_login": None,
     },
     "analyst": {
         "password_hash": generate_password_hash(
             _bootstrap_password("ANALYST_PASSWORD", "analyst")
         ),
         "role": "analyst",
+        "last_login": None,
     },
 }
 
@@ -189,6 +192,7 @@ def login_post():
         session["username"] = username
         session["role"] = user["role"]
         session["last_active"] = time.time()
+        user["last_login"] = time.time()
         logger.info("Login success: %s (role=%s)", username, user["role"])
         if flog:
             from security.forensic_logger import SecurityEvent, EventType, Severity

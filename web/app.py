@@ -535,6 +535,7 @@ _ANALYST_HTML = """
         <th onclick="sortBy('severity')">Severity &#8597;</th>
         <th>ICAO</th>
         <th>Details</th>
+        <th>Reviewed</th>
         <th style="color:#333">ID</th>
       </tr>
     </thead>
@@ -593,6 +594,14 @@ _ANALYST_HTML = """
       renderTable();
     }
 
+    function reviewEvent(eventId) {
+      fetch('/api/audit/events/' + encodeURIComponent(eventId) + '/review', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+      }).then(function() { loadEvents(); });
+    }
+
     function renderTable() {
       var sorted = allEvents.slice().sort(function(a, b) {
         var va = a[sortField], vb = b[sortField];
@@ -605,12 +614,19 @@ _ANALYST_HTML = """
       var rows = sorted.map(function(e) {
         var det = escapeHtml(JSON.stringify(e.details || {}));
         var sev = escapeHtml((e.severity || 'low').toLowerCase());
+        var reviewCell = e.event_type === 'event_reviewed' ? '&mdash;'
+          : e.reviewed
+            ? '<span style="color:#00ff41">&#10003; reviewed</span>'
+            : '<button onclick="reviewEvent(&quot;' + escapeHtml(e.id) + '&quot;)" '
+              + 'style="background:#222;color:#aaa;border:1px solid #444;padding:.1rem .4rem;'
+              + 'cursor:pointer;font-family:monospace;font-size:.9em">Mark reviewed</button>';
         return '<tr>'
           + '<td>' + escapeHtml(fmtTs(e.timestamp)) + '</td>'
           + '<td>' + escapeHtml(e.event_type || '—') + '</td>'
           + '<td class="sev-' + sev + '">' + escapeHtml((e.severity || '—').toUpperCase()) + '</td>'
           + '<td>' + escapeHtml(e.icao || '—') + '</td>'
           + '<td class="details" title="' + det + '">' + det + '</td>'
+          + '<td>' + reviewCell + '</td>'
           + '<td style="color:#2a2a2a;font-size:.7em">' + escapeHtml((e.id || '').slice(0, 8)) + '&hellip;</td>'
           + '</tr>';
       });
@@ -808,7 +824,35 @@ def create_app(trace_store=None, forensic_logger=None, heartbeat=None, pipeline_
         events = app.forensic_logger.read_events(
             event_type=event_type, severity=severity, icao=icao, limit=limit
         )
+
+        # Review status lives as separate EVENT_REVIEWED events (referencing
+        # the original event id in details) rather than mutating the original
+        # record — the log is append-only, so "marking an event reviewed"
+        # can't rewrite it in place without breaking the hash chain.
+        reviews = app.forensic_logger.read_events(event_type=EventType.EVENT_REVIEWED, limit=10000)
+        reviewed_ids = {r["details"].get("reviewed_event_id") for r in reviews if r.get("details")}
+        for e in events:
+            e["reviewed"] = e.get("id") in reviewed_ids
+
         return jsonify({"count": len(events), "events": events})
+
+    @app.post("/api/audit/events/<event_id>/review")
+    @require_role("analyst")
+    def api_review_event(event_id: str):
+        if not app.forensic_logger:
+            return jsonify({"error": "forensic_logger_not_configured"}), 503
+        payload = request.get_json(silent=True) or {}
+        note = str(payload.get("note", ""))[:500]
+        event = app.forensic_logger.log(SecurityEvent(
+            event_type=EventType.EVENT_REVIEWED,
+            severity=Severity.LOW,
+            details={
+                "reviewed_event_id": event_id,
+                "reviewed_by": session.get("username", "?"),
+                "note": note,
+            },
+        ))
+        return jsonify({"status": "ok", "review_event_id": event.id})
 
     @app.get("/api/audit/verify")
     @require_role("analyst")
