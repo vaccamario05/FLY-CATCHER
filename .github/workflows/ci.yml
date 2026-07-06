@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest tests/ -v
+
+      - name: Run Bandit (fail on Medium/High severity)
+        run: python -m bandit -r adsb_secure/ security/ ml/ web/ -ll -f txt
+
+      - name: Run pip-audit (report only, does not fail the build)
+        run: python -m pip-audit || true
