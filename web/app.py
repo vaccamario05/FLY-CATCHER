@@ -61,8 +61,13 @@ _DASHBOARD_HTML = """
     /* Alert panel */
     .alert-panel { border: 1px solid #ff4444; background:#0d0000; padding:.5rem .8rem; margin:.4rem 0; border-radius:3px; }
     .alert-panel-title { color:#ff4444; font-size:.9em; font-weight:bold; margin:0 0 .4rem; }
+    #alert-sev-filter { background:#111; color:#ff8888; border:1px solid #440000; padding:.25rem .4rem;
+                        font-family:monospace; font-size:.8em; margin-bottom:.4rem; }
+    #alert-list { max-height: 220px; overflow-y: auto; }
+    #alert-list.collapsed { display: none; }
     .alert-row { display:flex; align-items:baseline; gap:.5rem; padding:.2rem 0; border-bottom:1px solid #1a0000; font-size:.8em; }
     .alert-row:last-child { border-bottom:none; }
+    .alert-row.hidden-by-filter { display: none; }
     .sev-high { background:#ff0000; color:#000; padding:.1rem .3rem; border-radius:3px; font-size:.7em; font-weight:bold; }
     .sev-medium { background:#ff8800; color:#000; padding:.1rem .3rem; border-radius:3px; font-size:.7em; font-weight:bold; }
     .chain-banner { display:none; background:#1a0000; border:1px solid #ff0000; color:#ff4444;
@@ -96,9 +101,19 @@ _DASHBOARD_HTML = """
 
   {% if alerts %}
   <div class="alert-panel">
-    <div class="alert-panel-title">&#9888; ACTIVE ALERTS ({{ alerts|length }})</div>
+    <div class="alert-panel-title" onclick="toggleAlerts()" style="cursor:pointer">
+      &#9888; ACTIVE ALERTS (<span id="alert-visible-count">{{ alerts|length }}</span>/{{ alerts|length }})
+      <span id="alert-toggle-icon" style="float:right">&#9660;</span>
+    </div>
+    <select id="alert-sev-filter" onchange="filterAlerts()">
+      <option value="all">Tutte le severità</option>
+      <option value="critical">Solo critical</option>
+      <option value="high">High e sopra</option>
+      <option value="medium">Medium e sopra</option>
+    </select>
+    <div id="alert-list">
     {% for a in alerts %}
-    <div class="alert-row">
+    <div class="alert-row" data-severity="{{ a.severity }}">
       <span class="sev-{{ a.severity }}">{{ a.severity.upper() }}</span>
       <a href="/api/aircraft/{{ a.icao }}">{{ a.icao }}</a>
       {% if a.flight %}<em>({{ a.flight }})</em>{% endif %}
@@ -107,6 +122,7 @@ _DASHBOARD_HTML = """
       <small style="color:#888">{{ a.timestamp|int }}</small>
     </div>
     {% endfor %}
+    </div>
   </div>
   {% endif %}
 
@@ -222,6 +238,28 @@ _DASHBOARD_HTML = """
             }
           });
         }).catch(() => {});
+    }
+
+    var sevRank = {low: 0, medium: 1, high: 2, critical: 3};
+
+    function filterAlerts() {
+      var mode = document.getElementById('alert-sev-filter').value;
+      var minRank = mode === 'all' ? -1 : sevRank[mode];
+      var visible = 0;
+      document.querySelectorAll('#alert-list .alert-row').forEach(function(row) {
+        var ok = minRank < 0 || (sevRank[row.dataset.severity] || 0) >= minRank;
+        row.classList.toggle('hidden-by-filter', !ok);
+        if (ok) visible++;
+      });
+      var counter = document.getElementById('alert-visible-count');
+      if (counter) counter.textContent = visible;
+    }
+
+    function toggleAlerts() {
+      var list = document.getElementById('alert-list');
+      var icon = document.getElementById('alert-toggle-icon');
+      list.classList.toggle('collapsed');
+      icon.innerHTML = list.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
     }
 
     function filterTable() {
