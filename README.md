@@ -124,6 +124,18 @@ Se una password non viene configurata, il sistema ne genera una casuale all'avvi
 | `supervisor` | Dashboard + tracce (privilegio intermedio) |
 | `analyst` | Dashboard + log forensi + export CSV/PDF + configurazione soglie |
 
+### Test su traffico reale (ADS-B Exchange)
+
+Invece del simulatore, la pipeline può leggere da un feed HTTP esterno pubblico. ADS-B Exchange (readsb-based) usa lo stesso schema JSON per-record di dump1090 (`hex`, `alt_baro`, `gs`, ...), quindi è già compatibile — serve solo l'URL e, se richiesta, una API key:
+
+```bash
+export DUMP1090_URL="https://adsbexchange-com1.p.rapidapi.com/v2/lat/<lat>/lon/<lon>/dist/<km>/"
+export ADSB_HTTP_HEADERS='{"X-RapidAPI-Key": "<la-tua-chiave>", "X-RapidAPI-Host": "adsbexchange-com1.p.rapidapi.com"}'
+python3.11 -m adsb_secure --mode live
+```
+
+Nota: dati reali esterni non avranno mai un tag HMAC valido (nessun feed pubblico firma con la tua chiave PoC) → ogni traccia sarà classificata `UNVERIFIED`, mai `VALID`. Comportamento atteso, utile per testare validator/replay/anomaly detection su traffico genuino — il path HMAC resta verificabile solo in modalità simulator.
+
 ### Demo attacchi
 
 ```bash
@@ -141,7 +153,7 @@ Scenari disponibili: `ghost` · `ghost_valid` · `replay` · `tamper` · `flood`
 ## Test e qualità
 
 ```bash
-# Suite completa (113 test)
+# Suite completa (119 test)
 python3.11 -m pytest tests/ -v
 
 # Static analysis
@@ -162,7 +174,7 @@ ml/                feature_extractor, anomaly_detector, train
 web/               Flask app (dashboard, auth RBAC, config soglie, export audit)
 simulator/         JSONSimulator, HMACPreprocessor
 demo/              inject_attack.py, start_demo.sh, demo_script.md
-tests/             113 test (11 moduli, incl. perf)
+tests/             119 test (12 moduli, incl. perf, acquisition multi-provider)
 docs/vault/        Vault Obsidian — memoria persistente del progetto
 docs/appendice_tecnica.md  appendice tecnica per documentazione accademica
 device-rpi/        Fly-catcher originale (display legacy su Raspberry Pi)

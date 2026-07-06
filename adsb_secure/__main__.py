@@ -5,6 +5,7 @@ Sprint 2: acquisition → rate_limit → validate → hmac → replay → classi
 """
 
 import argparse
+import json
 import logging
 import os
 import threading
@@ -156,9 +157,16 @@ def main() -> None:
         replay_detector = ReplayDetector(check_stale=False)
         logger.info("Mode: simulator (%s) — stale check disabled", args.file)
     else:
-        acquisition = DataIngestion(url=args.url)
+        headers = {}
+        raw_headers = os.environ.get("ADSB_HTTP_HEADERS")
+        if raw_headers:
+            try:
+                headers = json.loads(raw_headers)
+            except json.JSONDecodeError:
+                logger.warning("ADSB_HTTP_HEADERS is not valid JSON — ignoring")
+        acquisition = DataIngestion(url=args.url, headers=headers)
         replay_detector = ReplayDetector()  # full check in live mode
-        logger.info("Mode: live (%s)", args.url)
+        logger.info("Mode: live (%s)%s", args.url, " [authenticated feed]" if headers else "")
 
     heartbeat = [time.time()]
 
