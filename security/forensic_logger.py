@@ -46,6 +46,7 @@ class EventType(str, Enum):
     LOG_CHAIN_BROKEN = "log_chain_broken"
     AUDIT_EXPORT = "audit_export"
     CONFIG_CHANGED = "config_changed"
+    STATUS_CHANGED = "status_changed"
 
 
 @dataclass

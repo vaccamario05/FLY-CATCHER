@@ -88,7 +88,21 @@ def run_pipeline(acquisition, rate_limiter, validator, hmac_validator,
             # 6 — Final classification
             aircraft = classifier(aircraft)
 
-            # 7 — Store
+            # 7 — Track explicit status transitions (e.g. SUSPICIOUS -> VALID)
+            # for audit — classify() re-evaluates from scratch every packet,
+            # so a trace naturally recovers once it passes all checks again;
+            # this makes that recovery/downgrade visible in the forensic log
+            # instead of only being inferable by diffing snapshots.
+            previous = trace_store.get_latest(aircraft.hex) if aircraft.hex else None
+            if previous is not None and previous.status != aircraft.status:
+                forensic_logger.log(SecurityEvent(
+                    event_type=EventType.STATUS_CHANGED,
+                    severity=Severity.LOW,
+                    icao=aircraft.hex,
+                    details={"from": previous.status.value, "to": aircraft.status.value},
+                ))
+
+            # 8 — Store
             trace_store.update(aircraft)
             accepted += 1
 
