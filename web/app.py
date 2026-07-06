@@ -99,6 +99,7 @@ _DASHBOARD_HTML = """
       {% if a.flight %}<em>({{ a.flight }})</em>{% endif %}
       &mdash; {{ a.reasons|join(' &middot; ') or 'Anomaly detected' }}
       {% if a.anomaly_score is not none %}<small style="color:#888">[score: {{ '%.2f'|format(a.anomaly_score) }}]</small>{% endif %}
+      <small style="color:#888">{{ a.timestamp|int }}</small>
     </div>
     {% endfor %}
   </div>
@@ -419,6 +420,7 @@ def _build_alerts(traces) -> list:
                 "severity": sev,
                 "reasons": reasons,
                 "anomaly_score": t.anomaly_score,
+                "timestamp": t.received_at,
             })
     return alerts
 

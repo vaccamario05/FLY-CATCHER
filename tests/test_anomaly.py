@@ -110,3 +110,24 @@ def test_false_positive_rate_on_normal_data(trained_detector):
             fp += 1
     fp_rate = fp / total
     assert fp_rate <= 0.10, f"FP rate too high: {fp_rate:.1%}"
+
+
+def test_false_negative_rate_on_ghost_data(trained_detector):
+    """
+    FN rate must be <= 20% on clearly anomalous (ghost) data (RNF3).
+    Detection bar (score > 0.5) matches test_ghost_vector_high_score —
+    the annotate()/classifier SUSPICIOUS threshold (0.7) is not reachable
+    by this synthetic IF model trained on 50 samples, same as the single-
+    sample check above.
+    """
+    total = 100
+    fn = 0
+    rng = np.random.default_rng(1)
+    base = np.array(_ghost_vector())
+    for _ in range(total):
+        vec = (base + rng.normal(0, 0.05 * np.abs(base).clip(min=1.0), len(base))).tolist()
+        score, _ = trained_detector.predict(vec)
+        if score <= 0.5:
+            fn += 1
+    fn_rate = fn / total
+    assert fn_rate <= 0.20, f"FN rate too high: {fn_rate:.1%}"
