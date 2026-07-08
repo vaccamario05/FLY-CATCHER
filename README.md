@@ -16,7 +16,7 @@ ADS-B Secure è un security hardening layer per sistemi di monitoraggio del traf
 | Materia | Progettazione di Software Sicuro |
 | Docenti | Prof. Luigi Romano, Prof. Luigi Coppolino |
 | Anno accademico | 2025/2026 |
-| Autori | Rocco Rizzitano, Mario Vacca |
+| Autori | Rocco Rizzitano, Mario Vacca Martina Lumastro |
 
 ---
 
